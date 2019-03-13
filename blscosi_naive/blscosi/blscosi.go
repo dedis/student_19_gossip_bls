@@ -16,10 +16,10 @@ import (
 
 const (
 	// BinaryName represents the Name of the binary
-	BinaryName = "blscosi"
+	BinaryName = "blscosi_naive"
 
 	// Version of the binary
-	Version = "1.00"
+	Version = "0.0.0"
 
 	optionGroup      = "group"
 	optionGroupShort = "g"

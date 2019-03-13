@@ -5,7 +5,6 @@ package protocol
 import (
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 )
 
 const defaultTimeout = 10 * time.Second
-const defaultSubleaderFailures = 2
 
 // VerificationFn is called on every node. Where msg is the message that is
 // co-signed and the data is additional data for verification.
@@ -36,42 +34,32 @@ func init() {
 // This protocol should only exist on the root node.
 type BlsCosi struct {
 	*onet.TreeNodeInstance
-	Msg            []byte
-	Data           []byte
-	CreateProtocol CreateProtocolFunction
+	Msg  []byte
+	Data []byte
 	// Timeout is not a global timeout for the protocol, but a timeout used
-	// for waiting for responses for sub protocols.
-	Timeout           time.Duration
-	SubleaderFailures int
-	Threshold         int
-	FinalSignature    chan BlsSignature // final signature that is sent back to client
+	// for waiting for responses.
+	Timeout        time.Duration
+	Threshold      int
+	FinalSignature chan BlsSignature // final signature that is sent back to client
 
-	stoppedOnce     sync.Once
-	subProtocols    []*SubBlsCosi
-	startChan       chan bool
-	subProtocolName string
-	verificationFn  VerificationFn
-	suite           *pairing.SuiteBn256
-	subTrees        BlsProtocolTree
+	stoppedOnce    sync.Once
+	startChan      chan bool
+	verificationFn VerificationFn
+	suite          *pairing.SuiteBn256
 }
-
-// CreateProtocolFunction is a function type which creates a new protocol
-// used in BlsCosi protocol for creating sub leader protocols.
-type CreateProtocolFunction func(name string, t *onet.Tree) (onet.ProtocolInstance, error)
 
 // NewDefaultProtocol is the default protocol function used for registration
 // with an always-true verification.
 // Called by GlobalRegisterDefaultProtocols
 func NewDefaultProtocol(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 	vf := func(a, b []byte) bool { return true }
-	return NewBlsCosi(n, vf, DefaultSubProtocolName, pairing.NewSuiteBn256())
+	return NewBlsCosi(n, vf, pairing.NewSuiteBn256())
 }
 
 // GlobalRegisterDefaultProtocols is used to register the protocols before use,
 // most likely in an init function.
 func GlobalRegisterDefaultProtocols() {
 	onet.GlobalProtocolRegister(DefaultProtocolName, NewDefaultProtocol)
-	onet.GlobalProtocolRegister(DefaultSubProtocolName, NewDefaultSubProtocol)
 }
 
 // DefaultThreshold computes the minimal threshold authorized using
@@ -82,55 +70,24 @@ func DefaultThreshold(n int) int {
 }
 
 // NewBlsCosi method is used to define the blscosi protocol.
-func NewBlsCosi(n *onet.TreeNodeInstance, vf VerificationFn, subProtocolName string, suite *pairing.SuiteBn256) (onet.ProtocolInstance, error) {
+func NewBlsCosi(n *onet.TreeNodeInstance, vf VerificationFn, suite *pairing.SuiteBn256) (onet.ProtocolInstance, error) {
 	nNodes := len(n.Roster().List)
 	c := &BlsCosi{
-		TreeNodeInstance:  n,
-		FinalSignature:    make(chan BlsSignature, 1),
-		Timeout:           defaultTimeout,
-		SubleaderFailures: defaultSubleaderFailures,
-		Threshold:         DefaultThreshold(nNodes),
-		startChan:         make(chan bool, 1),
-		verificationFn:    vf,
-		subProtocolName:   subProtocolName,
-		suite:             suite,
+		TreeNodeInstance: n,
+		FinalSignature:   make(chan BlsSignature, 1),
+		Timeout:          defaultTimeout,
+		Threshold:        DefaultThreshold(nNodes),
+		startChan:        make(chan bool, 1),
+		verificationFn:   vf,
+		suite:            suite,
 	}
-
-	// the default number of subtree is the square root to
-	// distribute the nodes evenly
-	c.SetNbrSubTree(int(math.Sqrt(float64(nNodes - 1))))
 
 	return c, nil
-}
-
-// SetNbrSubTree generates N new subtrees that will be used
-// for the protocol
-func (p *BlsCosi) SetNbrSubTree(nbr int) error {
-	if nbr > len(p.Roster().List)-1 {
-		return errors.New("Cannot have more subtrees than nodes")
-	}
-	if p.Threshold == 1 || nbr <= 0 {
-		p.subTrees = []*onet.Tree{}
-		return nil
-	}
-
-	var err error
-	p.subTrees, err = NewBlsProtocolTree(p.Tree(), nbr)
-	if err != nil {
-		return fmt.Errorf("error in tree generation: %s", err.Error())
-	}
-
-	return nil
 }
 
 // Shutdown stops the protocol
 func (p *BlsCosi) Shutdown() error {
 	p.stoppedOnce.Do(func() {
-		for _, subCosi := range p.subProtocols {
-			// we're stopping the root thus it will stop the children
-			// by itself using a broadcasted message
-			subCosi.Shutdown()
-		}
 		close(p.startChan)
 		close(p.FinalSignature)
 	})
@@ -151,7 +108,7 @@ func (p *BlsCosi) Dispatch() error {
 			return errors.New("protocol finished prematurely")
 		}
 	case <-time.After(time.Second):
-		return fmt.Errorf("timeout, did you forget to call Start?")
+		return errors.New("timeout, did you forget to call Start?")
 	}
 
 	log.Lvl3("root protocol started")
@@ -159,21 +116,8 @@ func (p *BlsCosi) Dispatch() error {
 	// Verification of the data is done before contacting the children
 	if ok := p.verificationFn(p.Msg, p.Data); !ok {
 		// root should not fail the verification otherwise it would not have started the protocol
-		return fmt.Errorf("verification failed on root node")
+		return errors.New("verification failed on root node")
 	}
-
-	// start all subprotocols
-	p.subProtocols = make([]*SubBlsCosi, len(p.subTrees))
-	for i, tree := range p.subTrees {
-		log.Lvlf3("Invoking start sub protocol on %v", tree.Root.ServerIdentity)
-		var err error
-		p.subProtocols[i], err = p.startSubProtocol(tree)
-		if err != nil {
-			log.Error(err)
-			return err
-		}
-	}
-	log.Lvl3(p.ServerIdentity().Address, "all protocols started")
 
 	// Wait and collect all the signature responses
 	responses, err := p.collectSignatures()
@@ -225,9 +169,6 @@ func (p *BlsCosi) checkIntegrity() error {
 	if p.verificationFn == nil {
 		return fmt.Errorf("verification function cannot be nil")
 	}
-	if p.subProtocolName == "" {
-		return fmt.Errorf("sub-protocol name cannot be empty")
-	}
 	if p.Timeout < 500*time.Microsecond {
 		return fmt.Errorf("unrealistic timeout")
 	}
@@ -247,38 +188,12 @@ func (p *BlsCosi) checkFailureThreshold(numFailure int) bool {
 	return numFailure > len(p.Roster().List)-p.Threshold
 }
 
-// startSubProtocol creates, parametrize and starts a subprotocol on a given tree
-// and returns the started protocol.
-func (p *BlsCosi) startSubProtocol(tree *onet.Tree) (*SubBlsCosi, error) {
-
-	pi, err := p.CreateProtocol(p.subProtocolName, tree)
-	if err != nil {
-		return nil, err
-	}
-	cosiSubProtocol := pi.(*SubBlsCosi)
-	cosiSubProtocol.Msg = p.Msg
-	cosiSubProtocol.Data = p.Data
-	// Fail fast enough if the subleader is failing to try
-	// at least three leaves as new subleader
-	cosiSubProtocol.Timeout = p.Timeout / time.Duration(p.SubleaderFailures+1)
-	// Give one leaf for free but as we don't know how many leaves
-	// could fail from the other trees, we need as much as possible
-	// responses. The main protocol will deal with early answers.
-	cosiSubProtocol.Threshold = tree.Size() - 1
-
-	log.Lvlf3("Starting sub protocol with subleader %v", tree.Root.Children[0].ServerIdentity)
-	err = cosiSubProtocol.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	return cosiSubProtocol, err
-}
-
-// Collect signatures from each sub-leader, restart whereever sub-leaders fail to respond.
+// Collect signatures from each sub-leader, restart wherever sub-leaders fail to respond.
 // The collected signatures are already aggregated for a particular group
 func (p *BlsCosi) collectSignatures() (ResponseMap, error) {
-	responsesChan := make(chan StructResponse, len(p.subProtocols))
+	// TODO
+
+	/*responsesChan := make(chan StructResponse, len(p.subProtocols))
 	errChan := make(chan error, len(p.subProtocols))
 	closeChan := make(chan bool)
 	// force to stop pending selects in case of timeout or quick answers
@@ -381,7 +296,8 @@ func (p *BlsCosi) collectSignatures() (ResponseMap, error) {
 			numFailure, p.Threshold)
 	}
 
-	return responseMap, nil
+	return responseMap, nil*/
+	return nil, nil
 }
 
 // Sign the message with this node and aggregates with all child signatures (in structResponses)

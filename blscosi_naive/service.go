@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"go.dedis.ch/cothority/v3/blscosi/protocol"
+	"github.com/dedis/student_19_gossip_bls/blscosi_naive/protocol"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/suites"
 	"go.dedis.ch/onet/v3"
@@ -22,7 +22,7 @@ var suite = suites.MustFind("bn256.adapter").(*pairing.SuiteBn256)
 var ServiceID onet.ServiceID
 
 // ServiceName is the name to refer to the CoSi service
-const ServiceName = "blsCoSiService"
+const ServiceName = "naiveCoSiService"
 
 func init() {
 	ServiceID, _ = onet.RegisterNewServiceWithSuite(ServiceName, suite, newCoSiService)
@@ -35,7 +35,6 @@ type Service struct {
 	*onet.ServiceProcessor
 	suite     pairing.Suite
 	Threshold int
-	NSubtrees int
 	Timeout   time.Duration
 }
 
@@ -54,12 +53,11 @@ type SignatureResponse struct {
 // SignatureRequest treats external request to this service.
 func (s *Service) SignatureRequest(req *SignatureRequest) (network.Message, error) {
 	// generate the tree
-	nNodes := len(req.Roster.List)
 	rooted := req.Roster.NewRosterWithRoot(s.ServerIdentity())
 	if rooted == nil {
 		return nil, errors.New("we're not in the roster")
 	}
-	tree := rooted.GenerateNaryTree(nNodes)
+	tree := rooted.GenerateStar()
 	if tree == nil {
 		return nil, errors.New("failed to generate tree")
 	}
@@ -70,7 +68,6 @@ func (s *Service) SignatureRequest(req *SignatureRequest) (network.Message, erro
 		return nil, errors.New("Couldn't make new protocol: " + err.Error())
 	}
 	p := pi.(*protocol.BlsCosi)
-	p.CreateProtocol = s.CreateProtocol
 	p.Timeout = s.Timeout
 	p.Msg = req.Message
 
@@ -78,13 +75,6 @@ func (s *Service) SignatureRequest(req *SignatureRequest) (network.Message, erro
 	// like a threshold of one
 	if s.Threshold > 0 {
 		p.Threshold = s.Threshold
-	}
-
-	if s.NSubtrees > 0 {
-		err = p.SetNbrSubTree(s.NSubtrees)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	// start the protocol
@@ -108,13 +98,10 @@ func (s *Service) SignatureRequest(req *SignatureRequest) (network.Message, erro
 // generate the PI on all others node.
 func (s *Service) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
 	log.Lvl3("Cosi Service received on", s.ServerIdentity(), "received new protocol event-", tn.ProtocolName())
-	switch tn.ProtocolName() {
-	case protocol.DefaultProtocolName:
-		return protocol.NewDefaultProtocol(tn)
-	case protocol.DefaultSubProtocolName:
-		return protocol.NewDefaultSubProtocol(tn)
+	if tn.ProtocolName() != protocol.DefaultProtocolName {
+		return nil, errors.New("no such protocol " + tn.ProtocolName())
 	}
-	return nil, errors.New("no such protocol " + tn.ProtocolName())
+	return protocol.NewDefaultProtocol(tn)
 }
 
 func newCoSiService(c *onet.Context) (onet.Service, error) {

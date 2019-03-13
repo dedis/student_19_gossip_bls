@@ -17,11 +17,7 @@ import (
 // DefaultProtocolName can be used from other packages to refer to this protocol.
 // If this name is used, then the suite used to verify signatures must be
 // the default cothority.Suite.
-const DefaultProtocolName = "blsCoSiProtoDefault"
-
-// DefaultSubProtocolName the name of the default sub protocol, started by the
-// main protocol.
-const DefaultSubProtocolName = "blsSubCoSiProtoDefault"
+const DefaultProtocolName = "naiveCoSiDefault"
 
 func init() {
 	network.RegisterMessages(&Announcement{}, &Response{}, &Stop{})
