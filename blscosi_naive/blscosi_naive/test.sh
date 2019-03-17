@@ -37,7 +37,7 @@ testReconnect(){
         testOut "Starting server $s again"
         runSrv $s
         testOK runCl 1 sign foo.txt
-        pkill -9 -f ./blscosi
+        pkill -9 -f ./blscosi_naive
     done
 }
 
@@ -65,12 +65,12 @@ testSignFile(){
 
 testServerCfg(){
     runSrvCfg 1
-    pkill -9 blscosi
+    pkill -9 blscosi_naive
     testFile srv1/private.toml
 }
 
 testBuild(){
-    testOK ./blscosi help
+    testOK ./blscosi_naive help
 }
 
 setupServers(){
@@ -94,15 +94,15 @@ runCl(){
     local D=cl$1/servers.toml
     shift
     echo "Running Client with $D $@"
-    dbgRun ./blscosi -d $DBG_APP $@ -g $D
+    dbgRun ./blscosi_naive -d $DBG_APP $@ -g $D
 }
 
 runSrvCfg(){
-    echo -e "localhost:200$(( 2 * $1 ))\nCosi $1\n$(pwd)/srv$1\n" | ./blscosi server setup > $OUT
+    echo -e "localhost:200$(( 2 * $1 ))\nCosi $1\n$(pwd)/srv$1\n" | ./blscosi_naive server setup > $OUT
 }
 
 runSrv(){
-    ( ./blscosi -d $DBG_SRV server -c srv$1/private.toml & )
+    ( ./blscosi_naive -d $DBG_SRV server -c srv$1/private.toml & )
 
     sleep 10
 }

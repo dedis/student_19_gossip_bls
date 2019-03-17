@@ -36,7 +36,7 @@ func main() {
 
 func createApp() *cli.App {
 	cliApp := cli.NewApp()
-	cliApp.Name = "blscosi"
+	cliApp.Name = "blscosi_naive"
 	cliApp.Usage = "collectively sign or verify a file; run a server for collective signing"
 	cliApp.Version = Version
 	binaryFlags := []cli.Flag{
