@@ -1,6 +1,6 @@
-// Package blscosi implements a service and client that provides an API
+// Package blscosi_naive implements a service and client that provides an API
 // to request a signature to a cothority
-package blscosi
+package blscosi_naive
 
 import (
 	"errors"
@@ -78,7 +78,7 @@ func (s *Service) SignatureRequest(req *SignatureRequest) (network.Message, erro
 	}
 
 	// start the protocol
-	log.Lvl3("Cosi Service starting up root protocol")
+	log.Lvl3("CoSi service starting up gossip protocol")
 	if err = pi.Start(); err != nil {
 		return nil, err
 	}

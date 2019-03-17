@@ -32,8 +32,8 @@ import (
 	_ "go.dedis.ch/cothority/v3/skipchain"
 	status "go.dedis.ch/cothority/v3/status/service"
 
+	"github.com/dedis/student_19_gossip_bls/blscosi_naive/blscosi_naive/check"
 	"go.dedis.ch/cothority/v3"
-	"go.dedis.ch/cothority/v3/blscosi/blscosi/check"
 	"go.dedis.ch/kyber/v3/util/encoding"
 	"go.dedis.ch/kyber/v3/util/key"
 	"go.dedis.ch/onet/v3/app"

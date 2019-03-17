@@ -10,8 +10,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"go.dedis.ch/cothority/v3/blscosi"
-	"go.dedis.ch/cothority/v3/blscosi/blscosi/check"
+	"github.com/dedis/student_19_gossip_bls/blscosi_naive"
+	"github.com/dedis/student_19_gossip_bls/blscosi_naive/blscosi_naive/check"
 	"go.dedis.ch/onet/v3/app"
 	"go.dedis.ch/onet/v3/log"
 	cli "gopkg.in/urfave/cli.v1"
@@ -87,7 +87,7 @@ func verifyFile(c *cli.Context) error {
 }
 
 // writeSigAsJSON - writes the JSON out to a file
-func writeSigAsJSON(res *blscosi.SignatureResponse, outW io.Writer) error {
+func writeSigAsJSON(res *blscosi_naive.SignatureResponse, outW io.Writer) error {
 	b, err := json.Marshal(sigHex{
 		Hash:      hex.EncodeToString(res.Hash),
 		Signature: hex.EncodeToString(res.Signature)},
@@ -113,7 +113,7 @@ func writeSigAsJSON(res *blscosi.SignatureResponse, outW io.Writer) error {
 }
 
 // sign takes a stream and a toml file defining the servers
-func sign(msg []byte, tomlFileName string) (*blscosi.SignatureResponse, error) {
+func sign(msg []byte, tomlFileName string) (*blscosi_naive.SignatureResponse, error) {
 	log.Lvl2("Starting signature")
 	f, err := os.Open(tomlFileName)
 	if err != nil {
@@ -161,7 +161,7 @@ func verify(fileName, sigFileName, groupToml string) error {
 		return err
 	}
 
-	sig := &blscosi.SignatureResponse{}
+	sig := &blscosi_naive.SignatureResponse{}
 	sig.Hash, err = hex.DecodeString(sigStr.Hash)
 	if err != nil {
 		return err

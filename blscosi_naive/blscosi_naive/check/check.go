@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"go.dedis.ch/cothority/v3/blscosi"
+	"github.com/dedis/student_19_gossip_bls/blscosi_naive"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/app"
@@ -134,13 +134,13 @@ func checkRoster(ro *onet.Roster, descs []string, detail bool) error {
 
 // SignStatement can be used to sign the contents passed in the io.Reader
 // (pass an io.File or use an strings.NewReader for strings)
-func SignStatement(msg []byte, ro *onet.Roster) (*blscosi.SignatureResponse, error) {
-	client := blscosi.NewClient()
-	publics := ro.ServicePublics(blscosi.ServiceName)
+func SignStatement(msg []byte, ro *onet.Roster) (*blscosi_naive.SignatureResponse, error) {
+	client := blscosi_naive.NewClient()
+	publics := ro.ServicePublics(blscosi_naive.ServiceName)
 
 	log.Lvlf4("Signing message %x", msg)
 
-	pchan := make(chan *blscosi.SignatureResponse, 1)
+	pchan := make(chan *blscosi_naive.SignatureResponse, 1)
 	echan := make(chan error, 1)
 	go func() {
 		log.Lvl3("Waiting for the response on SignRequest")
@@ -169,9 +169,9 @@ func SignStatement(msg []byte, ro *onet.Roster) (*blscosi.SignatureResponse, err
 }
 
 // VerifySignatureHash checks that the signature is correct
-func VerifySignatureHash(b []byte, sig *blscosi.SignatureResponse, ro *onet.Roster) error {
-	suite := blscosi.NewClient().Suite().(*pairing.SuiteBn256)
-	publics := ro.ServicePublics(blscosi.ServiceName)
+func VerifySignatureHash(b []byte, sig *blscosi_naive.SignatureResponse, ro *onet.Roster) error {
+	suite := blscosi_naive.NewClient().Suite().(*pairing.SuiteBn256)
+	publics := ro.ServicePublics(blscosi_naive.ServiceName)
 
 	h := suite.Hash()
 	_, err := h.Write(b)
