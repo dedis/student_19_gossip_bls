@@ -19,7 +19,7 @@ const (
 	BinaryName = "blscosi_naive"
 
 	// Version of the binary
-	Version = "0.0.0"
+	Version = "0.1.0"
 
 	optionGroup      = "group"
 	optionGroupShort = "g"

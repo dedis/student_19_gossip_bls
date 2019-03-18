@@ -3,12 +3,11 @@ package protocol
 import (
 	"errors"
 	"fmt"
-	"time"
 
-	"go.dedis.ch/kyber/v3"
-	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/sign/bls"
-	"go.dedis.ch/kyber/v3/sign/cosi"
+	"go.dedis.ch/kyber"
+	"go.dedis.ch/kyber/pairing"
+	"go.dedis.ch/kyber/sign/bls"
+	"go.dedis.ch/kyber/sign/cosi"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -20,7 +19,7 @@ import (
 const DefaultProtocolName = "naiveCoSiDefault"
 
 func init() {
-	network.RegisterMessages(&Announcement{}, &Response{}, &Stop{})
+	network.RegisterMessages(&Rumor{}, &Response{}, &Stop{})
 }
 
 // ResponseMap is the container used to store responses coming from the children
@@ -87,6 +86,8 @@ func (sig BlsSignature) VerifyWithPolicy(ps pairing.Suite, msg []byte, publics [
 	lenCom := ps.G1().PointLen()
 	signature := sig[:lenCom]
 
+	log.Lvlf5("Verifying against %v", signature)
+
 	// Unpack the participation mask and get the aggregate public key
 	mask, err := sig.GetMask(ps, publics)
 	if err != nil {
@@ -108,20 +109,17 @@ func (sig BlsSignature) VerifyWithPolicy(ps pairing.Suite, msg []byte, publics [
 	return nil
 }
 
-// Announcement is the blscosi annoucement message
-type Announcement struct {
-	Msg       []byte // statement to be signed
-	Data      []byte
-	Nonce     []byte
-	Timeout   time.Duration
-	Threshold int
+// Response is a struct that can be sent in the gossip protocol
+type Rumor struct {
+	ResponseMap ResponseMap
+	Msg         []byte
 }
 
-// StructAnnouncement just contains Announcement and the data necessary to identify and
+// RumorMessage just contains a Rumor and the data necessary to identify and
 // process the message in the onet framework.
-type StructAnnouncement struct {
+type RumorMessage struct {
 	*onet.TreeNode
-	Announcement
+	Rumor
 }
 
 // Response is the blscosi response message
