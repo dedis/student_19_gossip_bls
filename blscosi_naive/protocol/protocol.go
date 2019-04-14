@@ -215,7 +215,7 @@ func (p *BlsCosi) sendRumor(responses ResponseMap) {
 
 	selfIndex := -1
 	for i, node := range allNodes {
-		if node == self {
+		if node.Equal(self) {
 			selfIndex = i
 			break
 		}
