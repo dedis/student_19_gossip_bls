@@ -23,7 +23,7 @@ import (
 	"fmt"
 
 	"github.com/BurntSushi/toml"
-	"github.com/dedis/student_19_gossip_bls/blscosi_naive"
+	blscosi "github.com/dedis/student_19_gossip_bls/blscosi_naive"
 	"github.com/dedis/student_19_gossip_bls/blscosi_naive/protocol"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
@@ -33,15 +33,13 @@ import (
 )
 
 func init() {
-	onet.SimulationRegister("BlsCosiProtocol", NewSimulationProtocol)
+	onet.SimulationRegister("BlsCosiNaiveProtocol", NewSimulationProtocol)
 }
 
 // SimulationProtocol implements onet.Simulation.
 type SimulationProtocol struct {
 	onet.SimulationBFTree
-	NSubtrees         int
-	FailingSubleaders int
-	FailingLeafs      int
+	FailingLeaves int
 }
 
 // NewSimulationProtocol is used internally to register the simulation (see the init()
@@ -77,18 +75,20 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 		log.Fatal("Didn't find this node in roster")
 	}
 
-	tree, err := protocol.NewBlsProtocolTree(config.Tree, s.NSubtrees)
-	if err != nil {
-		return err
-	}
+	//tree, err := protocol.NewBlsProtocolTree(config.Tree, s.NSubtrees)
+	//if err != nil {
+	//	return err
+	//}
 
-	leaves := tree.GetLeaves()
-	subleaders := tree.GetSubLeaders()
+	//leaves := tree.GetLeaves()
+	//subleaders := tree.GetSubLeaders()
 
-	toIntercept := append(leaves[:s.FailingLeafs], subleaders[:s.FailingSubleaders]...)
+	leaves := config.Tree.Root.Children
+
+	toIntercept := leaves[:s.FailingLeaves]
 	// intercept announcements on some nodes
 	for _, n := range toIntercept {
-		if n.ID.Equal(config.Server.ServerIdentity.ID) {
+		if n.ServerIdentity.ID.Equal(config.Server.ServerIdentity.ID) {
 			config.Server.RegisterProcessorFunc(onet.ProtocolMsgID, func(e *network.Envelope) error {
 				//get message
 				_, msg, err := network.Unmarshal(e.Msg.(*onet.ProtocolMsg).MsgSlice, config.Server.Suite())
@@ -98,7 +98,7 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 				}
 
 				switch msg.(type) {
-				case *protocol.Announcement, *protocol.Response:
+				case *protocol.Rumor:
 					log.Lvl1("Ignoring blscosi message for simulation on ", config.Server.ServerIdentity)
 				default:
 					config.Overlay.Process(e)
@@ -120,8 +120,7 @@ func (s *SimulationProtocol) Run(config *onet.SimulationConfig) error {
 		log.Lvl1("Starting round", round)
 		round := monitor.NewTimeMeasure("round")
 		blscosiService := config.GetService(blscosi.ServiceName).(*blscosi.Service)
-		blscosiService.NSubtrees = s.NSubtrees
-		blscosiService.Threshold = s.Hosts - s.FailingLeafs - s.FailingSubleaders
+		blscosiService.Threshold = s.Hosts - s.FailingLeaves
 
 		client := blscosi.NewClient()
 		proposal := []byte{0xFF}

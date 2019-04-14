@@ -208,6 +208,11 @@ func (p *BlsCosi) sendRumor(responses ResponseMap) {
 	allNodes := append(root.Children, root)
 
 	numPeers := len(allNodes) - 1
+	if numPeers <= 0 {
+		log.Lvl1("no other nodes in the roster")
+		return
+	}
+
 	selfIndex := -1
 	for i, node := range allNodes {
 		if node == self {
@@ -218,11 +223,6 @@ func (p *BlsCosi) sendRumor(responses ResponseMap) {
 	if selfIndex == -1 {
 		log.Lvl1("couldn't find outselves in the roster")
 		numPeers++
-	}
-
-	if numPeers <= 0 {
-		log.Lvl1("no other nodes in the roster")
-		return
 	}
 
 	index := rand.Intn(numPeers)

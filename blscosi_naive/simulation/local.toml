@@ -5,12 +5,11 @@ Rounds = 1
 RunWait = "600s"
 Suite = "bn256.adapter"
 
-Hosts, NSubtrees, FailingSubleaders,FailingLeafs
-  4,  1, 0,  0
-  4,  1, 0,  1
-  4,  3, 0,  0
- 10,  3, 0,  0
- 10,  3, 2,  0
- 10,  3, 0,  3
- 20,  5, 0,  0
- 20,  5, 1,  5
+Hosts, FailingLeaves
+    4, 0
+    4, 1
+   10, 0
+   10, 1
+   10, 3
+   20, 0
+   20, 5

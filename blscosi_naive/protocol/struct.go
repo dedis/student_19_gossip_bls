@@ -128,13 +128,6 @@ type Response struct {
 	Mask      []byte
 }
 
-// StructResponse just contains Response and the data necessary to identify and
-// process the message in the onet framework.
-type StructResponse struct {
-	*onet.TreeNode
-	Response
-}
-
 // Refusal is the signed refusal response from a given node
 type Refusal struct {
 	Signature []byte
