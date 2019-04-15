@@ -75,17 +75,14 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 		log.Fatal("Didn't find this node in roster")
 	}
 
-	//tree, err := protocol.NewBlsProtocolTree(config.Tree, s.NSubtrees)
-	//if err != nil {
-	//	return err
-	//}
-
-	//leaves := tree.GetLeaves()
-	//subleaders := tree.GetSubLeaders()
-
 	leaves := config.Tree.Root.Children
 
-	toIntercept := leaves[:s.FailingLeaves]
+	numToIntercept := s.FailingLeaves
+	if len(leaves) < s.FailingLeaves {
+		og.Lvl1("Warning: not enough children for failing. Is the shape of the tree correct?")
+		numToIntercept = len(leaves)
+	}
+	toIntercept := leaves[:numToIntercept]
 	// intercept announcements on some nodes
 	for _, n := range toIntercept {
 		if n.ServerIdentity.ID.Equal(config.Server.ServerIdentity.ID) {

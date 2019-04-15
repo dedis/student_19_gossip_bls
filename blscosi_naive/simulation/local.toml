@@ -1,6 +1,6 @@
 Simulation = "BlsCosiNaiveProtocol"
 Servers = 8
-Bf = 4
+Bf = 200
 Rounds = 1
 RunWait = "600s"
 Suite = "bn256.adapter"
