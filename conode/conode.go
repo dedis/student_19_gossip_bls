@@ -22,6 +22,7 @@ import (
 
 	// Services that will be compiled in.
 	_ "github.com/dedis/student_19_gossip_bls/blscosi_naive"
+	_ "github.com/dedis/student_19_gossip_bls/blscosi_simple"
 	_ "go.dedis.ch/cothority/v3/authprox"
 	_ "go.dedis.ch/cothority/v3/byzcoin"
 	_ "go.dedis.ch/cothority/v3/byzcoin/contracts"
@@ -32,6 +33,7 @@ import (
 	_ "go.dedis.ch/cothority/v3/skipchain"
 	status "go.dedis.ch/cothority/v3/status/service"
 
+	// TODO: this import seems wrong
 	"github.com/dedis/student_19_gossip_bls/blscosi_naive/blscosi_naive/check"
 	"go.dedis.ch/cothority/v3"
 	"go.dedis.ch/kyber/v3/util/encoding"

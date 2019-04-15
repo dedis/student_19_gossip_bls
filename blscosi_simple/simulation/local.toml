@@ -1,0 +1,15 @@
+Simulation = "BlsCosiSimpleProtocol"
+Servers = 8
+Bf = 200
+Rounds = 1
+RunWait = "600s"
+Suite = "bn256.adapter"
+
+Hosts, FailingLeaves
+    4, 0
+    4, 1
+   10, 0
+   10, 1
+   10, 3
+   20, 0
+   20, 5

@@ -23,8 +23,8 @@ import (
 	"fmt"
 
 	"github.com/BurntSushi/toml"
-	blscosi "github.com/dedis/student_19_gossip_bls/blscosi_naive"
-	"github.com/dedis/student_19_gossip_bls/blscosi_naive/protocol"
+	blscosi "github.com/dedis/student_19_gossip_bls/blscosi_simple"
+	"github.com/dedis/student_19_gossip_bls/blscosi_simple/protocol"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
@@ -33,7 +33,7 @@ import (
 )
 
 func init() {
-	onet.SimulationRegister("BlsCosiNaiveProtocol", NewSimulationProtocol)
+	onet.SimulationRegister("BlsCosiSimpleProtocol", NewSimulationProtocol)
 }
 
 // SimulationProtocol implements onet.Simulation.
