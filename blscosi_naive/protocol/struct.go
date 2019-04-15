@@ -122,6 +122,17 @@ type RumorMessage struct {
 	Rumor
 }
 
+// Shutdown is a struct that can be sent in the gossip protocol
+type Shutdown struct {
+}
+
+// ShutdownMessage just contains a Shutdown and the data necessary to identify
+// and process the message in the onet framework.
+type ShutdownMessage struct {
+	*onet.TreeNode
+	Shutdown
+}
+
 // Response is the blscosi response message
 type Response struct {
 	Signature BlsSignature

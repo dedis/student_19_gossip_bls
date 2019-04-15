@@ -20,6 +20,8 @@ import (
 const defaultTimeout = 10 * time.Second
 const gossipTick = 100 * time.Millisecond
 
+const shutdownPeers = 2
+
 // VerificationFn is called on every node. Where msg is the message that is
 // co-signed and the data is additional data for verification.
 type VerificationFn func(msg, data []byte) bool
@@ -48,8 +50,9 @@ type BlsCosi struct {
 	verificationFn VerificationFn
 	suite          *pairing.SuiteBn256
 
-	// internodes channel
-	RumorsChan chan RumorMessage
+	// internodes channels
+	RumorsChan   chan RumorMessage
+	ShutdownChan chan ShutdownMessage
 }
 
 // NewDefaultProtocol is the default protocol function used for registration
@@ -86,7 +89,7 @@ func NewBlsCosi(n *onet.TreeNodeInstance, vf VerificationFn, suite *pairing.Suit
 		suite:            suite,
 	}
 
-	err := c.RegisterChannels(&c.RumorsChan)
+	err := c.RegisterChannels(&c.RumorsChan, &c.ShutdownChan)
 	if err != nil {
 		return nil, errors.New("couldn't register channels: " + err.Error())
 	}
@@ -107,7 +110,7 @@ func (p *BlsCosi) Shutdown() error {
 func (p *BlsCosi) Dispatch() error {
 	defer p.Done()
 
-	protocolTimeout := time.After(3500 * time.Millisecond)
+	protocolTimeout := time.After(9000 * time.Millisecond)
 
 	// responses is a map where we collect all signatures.
 	responses := make(ResponseMap)
@@ -134,14 +137,21 @@ func (p *BlsCosi) Dispatch() error {
 	log.Lvlf3("Gossip protocol started at node %v", p.ServerIdentity())
 
 	ticker := time.NewTicker(gossipTick)
-	for {
-		done := false
+	done := false
+	for !done {
 		select {
 		case rumor := <-p.RumorsChan:
 			updateResponses(responses, rumor.ResponseMap)
 			log.Lvlf5("Incoming rumor, %d known, %d needed, root %v", len(responses), len(p.Roster().List), p.IsRoot())
 			if p.IsRoot() && len(responses) == len(p.Roster().List) {
 				// We've got all the signatures.
+				targets, err := p.getRandomPeers(shutdownPeers)
+				if err != nil {
+					log.Lvl1("couldn't get random peers:", err)
+				} else {
+					log.Lvl5("Sending shutdown")
+					p.sendShutdown(targets)
+				}
 				done = true
 			}
 			if len(p.Msg) == 0 && len(rumor.Msg) > 0 {
@@ -152,14 +162,20 @@ func (p *BlsCosi) Dispatch() error {
 					return err
 				}
 			}
+		case <-p.ShutdownChan:
+			log.Lvl5("Received shutdown")
+			targets, err := p.getRandomPeers(shutdownPeers)
+			if err != nil {
+				log.Lvl1("couldn't get random peers:", err)
+			} else {
+				p.sendShutdown(targets)
+			}
+			done = true
 		case <-ticker.C:
 			log.Lvl5("Outgoing rumor")
 			p.sendRumor(responses)
 		case <-protocolTimeout:
 			done = true
-		}
-		if done {
-			break
 		}
 	}
 	log.Lvl5("Done with gossiping")
@@ -203,36 +219,63 @@ func (p *BlsCosi) trySign(responses ResponseMap) error {
 // sendRumor sends the given signatures to a random peer.
 func (p *BlsCosi) sendRumor(responses ResponseMap) {
 	// Get a random node except self.
+	target, err := p.getRandomPeer()
+	if err != nil {
+		log.Lvl1("couldn't get a random peer:", err)
+	}
+	p.SendTo(target, &Rumor{responses, p.Msg})
+}
+
+// sendShutdown sends a shutdown message to some random peers.
+func (p *BlsCosi) sendShutdown(targets []*onet.TreeNode) {
+	for _, target := range targets {
+		p.SendTo(target, &Shutdown{})
+	}
+}
+
+// getRandomPeers returns a slice of random peers (not including self).
+func (p *BlsCosi) getRandomPeers(numTargets int) ([]*onet.TreeNode, error) {
 	self := p.TreeNode()
 	root := p.Root()
 	allNodes := append(root.Children, root)
 
 	numPeers := len(allNodes) - 1
-	if numPeers <= 0 {
-		log.Lvl1("no other nodes in the roster")
-		return
-	}
 
-	selfIndex := -1
+	selfIndex := len(allNodes)
 	for i, node := range allNodes {
 		if node.Equal(self) {
 			selfIndex = i
 			break
 		}
 	}
-	if selfIndex == -1 {
+	if selfIndex == len(allNodes) {
 		log.Lvl1("couldn't find outselves in the roster")
 		numPeers++
 	}
 
-	index := rand.Intn(numPeers)
-	if index >= selfIndex {
-		index++
+	if numPeers < numTargets {
+		return nil, errors.New("not enough nodes in the roster")
 	}
 
-	log.Lvlf5("chose %d, maximum %d", index, len(allNodes)-1)
-	target := allNodes[index]
-	p.SendTo(target, &Rumor{responses, p.Msg})
+	var results []*onet.TreeNode
+	for i := 0; i < numTargets; i++ {
+		index := rand.Intn(numPeers)
+		if index >= selfIndex {
+			index++
+		}
+		results = append(results, allNodes[index])
+	}
+
+	return results, nil
+}
+
+// getRandomPeer returns a random peer (not including self).
+func (p *BlsCosi) getRandomPeer() (*onet.TreeNode, error) {
+	peers, err := p.getRandomPeers(1)
+	if err != nil {
+		return nil, err
+	}
+	return peers[0], nil
 }
 
 // Start is done only by root and starts the protocol.
