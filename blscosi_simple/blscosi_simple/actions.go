@@ -112,7 +112,7 @@ func writeSigAsJSON(res *blscosi_simple.SignatureResponse, outW io.Writer) error
 	return err
 }
 
-// sign takes a stream and a toml file defining the servers
+// sign takes a byte slice and a toml file defining the servers
 func sign(msg []byte, tomlFileName string) (*blscosi_simple.SignatureResponse, error) {
 	log.Lvl2("Starting signature")
 	f, err := os.Open(tomlFileName)

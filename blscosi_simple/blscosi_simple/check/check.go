@@ -133,7 +133,6 @@ func checkRoster(ro *onet.Roster, descs []string, detail bool) error {
 }
 
 // SignStatement can be used to sign the contents passed in the io.Reader
-// (pass an io.File or use an strings.NewReader for strings)
 func SignStatement(msg []byte, ro *onet.Roster) (*blscosi_simple.SignatureResponse, error) {
 	client := blscosi_simple.NewClient()
 	publics := ro.ServicePublics(blscosi_simple.ServiceName)
