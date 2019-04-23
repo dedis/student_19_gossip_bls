@@ -19,6 +19,7 @@ import (
 
 const defaultTimeout = 10 * time.Second
 const gossipTick = 100 * time.Millisecond
+const shutdownAfter = 11 * time.Second // hard shutdown regardless of the state of the protocol
 
 const shutdownPeers = 2
 
@@ -34,7 +35,7 @@ func init() {
 
 // BlsCosi holds the parameters of the protocol.
 // It also defines a channel that will receive the final signature.
-// This protocol should only exist on the root node.
+// This protocol exists only on the root node.
 type BlsCosi struct {
 	*onet.TreeNodeInstance
 	Msg  []byte
@@ -110,7 +111,7 @@ func (p *BlsCosi) Shutdown() error {
 func (p *BlsCosi) Dispatch() error {
 	defer p.Done()
 
-	protocolTimeout := time.After(9000 * time.Millisecond)
+	protocolTimeout := time.After(shutdownAfter)
 
 	// responses is a map where we collect all signatures.
 	responses := make(ResponseMap)
@@ -143,7 +144,7 @@ func (p *BlsCosi) Dispatch() error {
 		case rumor := <-p.RumorsChan:
 			updateResponses(responses, rumor.ResponseMap)
 			log.Lvlf5("Incoming rumor, %d known, %d needed, root %v", len(responses), len(p.Roster().List), p.IsRoot())
-			if p.IsRoot() && len(responses) == len(p.Roster().List) {
+			if p.IsRoot() && len(responses) >= p.Threshold {
 				// We've got all the signatures.
 				targets, err := p.getRandomPeers(shutdownPeers)
 				if err != nil {
