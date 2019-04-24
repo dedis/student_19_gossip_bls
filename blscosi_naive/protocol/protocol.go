@@ -34,7 +34,7 @@ func init() {
 
 // BlsCosi holds the parameters of the protocol.
 // It also defines a channel that will receive the final signature.
-// This protocol should only exist on the root node.
+// This protocol exists on all nodes.
 type BlsCosi struct {
 	*onet.TreeNodeInstance
 	Msg  []byte

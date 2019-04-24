@@ -18,10 +18,10 @@ import (
 )
 
 const defaultTimeout = 10 * time.Second
-const gossipTick = 100 * time.Millisecond
 const shutdownAfter = 11 * time.Second // hard shutdown regardless of the state of the protocol
+const gossipTick = 100 * time.Millisecond
 
-const shutdownPeers = 2
+const shutdownPeers = 2 // number of peers that the shutdown message is sent to
 
 // VerificationFn is called on every node. Where msg is the message that is
 // co-signed and the data is additional data for verification.
@@ -35,7 +35,7 @@ func init() {
 
 // BlsCosi holds the parameters of the protocol.
 // It also defines a channel that will receive the final signature.
-// This protocol exists only on the root node.
+// This protocol exists on all nodes.
 type BlsCosi struct {
 	*onet.TreeNodeInstance
 	Msg  []byte
@@ -128,7 +128,7 @@ func (p *BlsCosi) Dispatch() error {
 		}
 
 		// Add own signature.
-		// If we aren't root, we don't know what the message is.
+		// If we aren't root, we don't yet know what the message is.
 		err := p.trySign(responses)
 		if err != nil {
 			return err
@@ -138,6 +138,7 @@ func (p *BlsCosi) Dispatch() error {
 	log.Lvlf3("Gossip protocol started at node %v", p.ServerIdentity())
 
 	ticker := time.NewTicker(gossipTick)
+	// shutdown := false
 	done := false
 	for !done {
 		select {
