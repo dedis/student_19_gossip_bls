@@ -21,6 +21,7 @@ const defaultTimeout = 10 * time.Second
 const shutdownAfter = 11 * time.Second // finally truly shutdown the protocol
 const gossipTick = 100 * time.Millisecond
 
+const rumorPeers = 2    // number of peers that a rumor message is sent to
 const shutdownPeers = 2 // number of peers that the shutdown message is sent to
 
 // VerificationFn is called on every node. Where msg is the message that is
@@ -139,11 +140,8 @@ func (p *BlsCosi) Dispatch() error {
 
 	ticker := time.NewTicker(gossipTick)
 
-	// When shutdown is true, we initiate a "soft shutdown": the protocol stays
-	// alive on this node, but no more rumor messages are sent. We respond to
-	// every non-shutdown message with a shutdown message, to ensure that all
-	// nodes will shut down eventually. This is also the reason why we don't
-	// immediately do a hard shutdown.
+	// When `shutdown` is true, we'll initiate a "soft shutdown": the protocol
+	// stays alive here on this node, but no more rumor messages are sent.
 	shutdown := false
 	done := false
 	for !shutdown {
@@ -152,7 +150,7 @@ func (p *BlsCosi) Dispatch() error {
 			updateResponses(responses, rumor.ResponseMap)
 			log.Lvlf5("Incoming rumor, %d known, %d needed, is-root %v",
 				len(responses), p.Threshold, p.IsRoot())
-			if p.IsRoot() && len(responses) >= 1 {
+			if p.IsRoot() && len(responses) >= p.Threshold {
 				// We've got all the signatures.
 				shutdown = true
 			}
@@ -170,7 +168,7 @@ func (p *BlsCosi) Dispatch() error {
 			shutdown = true
 		case <-ticker.C:
 			log.Lvl5("Outgoing rumor")
-			p.sendRumor(responses)
+			p.sendRumors(responses)
 		case <-protocolTimeout:
 			shutdown = true
 			done = true
@@ -197,14 +195,11 @@ func (p *BlsCosi) Dispatch() error {
 		log.Lvlf3("%v created final signature %x with mask %b", p.ServerIdentity(), signature, finalMask.Mask())
 	}
 
-	targets, err := p.getRandomPeers(shutdownPeers)
-	if err != nil {
-		log.Lvl1("Couldn't get random peers:", err)
-	} else {
-		log.Lvl5("Sending shutdown")
-		p.sendShutdowns(targets)
-	}
+	p.sendShutdowns()
 
+	// We respond to every non-shutdown message with a shutdown message, to
+	// ensure that all nodes will shut down eventually. This is also the reason
+	// why we don't immediately do a hard shutdown.
 	for !done {
 		select {
 		case rumor := <-p.RumorsChan:
@@ -236,18 +231,32 @@ func (p *BlsCosi) trySign(responses ResponseMap) error {
 	return nil
 }
 
-// sendRumor sends the given signatures to a random peer.
-func (p *BlsCosi) sendRumor(responses ResponseMap) {
-	// Get a random node except self.
-	target, err := p.getRandomPeer()
+// sendRumors sends a rumor message to some peers.
+func (p *BlsCosi) sendRumors(responses ResponseMap) {
+	targets, err := p.getRandomPeers(shutdownPeers)
 	if err != nil {
-		log.Lvl1("couldn't get a random peer:", err)
+		log.Lvl1("Couldn't get random peers:", err)
+		return
 	}
+	log.Lvl5("Sending rumors")
+	for _, target := range targets {
+		p.sendRumor(target, responses)
+	}
+}
+
+// sendRumor sends the given signatures to a random peer.
+func (p *BlsCosi) sendRumor(target *onet.TreeNode, responses ResponseMap) {
 	p.SendTo(target, &Rumor{responses, p.Msg})
 }
 
-// sendShutdowns sends a shutdown message to some peers.
-func (p *BlsCosi) sendShutdowns(targets []*onet.TreeNode) {
+// sendShutdowns sends a shutdown message to some random peers.
+func (p *BlsCosi) sendShutdowns() {
+	targets, err := p.getRandomPeers(shutdownPeers)
+	if err != nil {
+		log.Lvl1("Couldn't get random peers:", err)
+		return
+	}
+	log.Lvl5("Sending shutdowns")
 	for _, target := range targets {
 		p.sendShutdown(target)
 	}
