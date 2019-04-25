@@ -128,6 +128,8 @@ type Shutdown struct {
 
 // ShutdownMessage just contains a Shutdown and the data necessary to identify
 // and process the message in the onet framework.
+// It initiates a "soft shutdown": the protocol stays alive on this node, but
+// no more rumor messages are sent.
 type ShutdownMessage struct {
 	*onet.TreeNode
 	Shutdown
