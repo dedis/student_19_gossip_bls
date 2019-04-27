@@ -124,6 +124,7 @@ type RumorMessage struct {
 
 // Shutdown is a struct that can be sent in the gossip protocol
 type Shutdown struct {
+	ShutdownSig BlsSignature
 }
 
 // ShutdownMessage just contains a Shutdown and the data necessary to identify
