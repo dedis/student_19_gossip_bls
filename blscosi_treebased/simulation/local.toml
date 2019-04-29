@@ -1,4 +1,4 @@
-Simulation = "BlsCosiSimpleProtocol"
+Simulation = "BlsCosiTreebasedProtocol"
 Servers = 8
 Bf = 200
 Rounds = 1
