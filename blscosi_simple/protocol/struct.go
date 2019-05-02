@@ -123,8 +123,13 @@ type RumorMessage struct {
 }
 
 // Shutdown is a struct that can be sent in the gossip protocol
+// A valid shutdown message must contain a proof that the root has seen a valid
+// final signature. This is to prevent faked shutdown messages that take down the
+// gossip protocol. Thus the shutdown message contains the final signature,
+// which in turn is signed by root.
 type Shutdown struct {
-	ShutdownSig BlsSignature
+	FinalCoSignature BlsSignature
+	RootSig          BlsSignature
 }
 
 // ShutdownMessage just contains a Shutdown and the data necessary to identify

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"go.dedis.ch/kyber/sign/bls"
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/kyber/v3/sign/cosi"
 	"go.dedis.ch/onet"
 	"go.dedis.ch/onet/v3/log"
@@ -23,8 +23,6 @@ const gossipTick = 100 * time.Millisecond
 
 const rumorPeers = 2    // number of peers that a rumor message is sent to
 const shutdownPeers = 2 // number of peers that the shutdown message is sent to
-
-var shutdownText = []byte("SHUTDOWN")
 
 // VerificationFn is called on every node. Where msg is the message that is
 // co-signed and the data is additional data for verification.
@@ -142,7 +140,7 @@ func (p *BlsCosi) Dispatch() error {
 
 	ticker := time.NewTicker(gossipTick)
 
-	var shutdownSig BlsSignature
+	var shutdownStruct Shutdown
 
 	// When `shutdown` is true, we'll initiate a "soft shutdown": the protocol
 	// stays alive here on this node, but no more rumor messages are sent.
@@ -169,11 +167,11 @@ func (p *BlsCosi) Dispatch() error {
 			}
 		case shutdownMsg := <-p.ShutdownChan:
 			log.Lvl5("Received shutdown")
-			if p.verifyShutdown(shutdownMsg) {
-				shutdownSig = shutdownMsg.ShutdownSig
+			if err := p.verifyShutdown(shutdownMsg); err == nil {
+				shutdownStruct = shutdownMsg.Shutdown
 				shutdown = true
 			} else {
-				log.Lvl1("Got spoofed shutdown")
+				log.Lvl1("Got spoofed shutdown:", err)
 				// Don't take any action
 			}
 		case <-ticker.C:
@@ -201,18 +199,19 @@ func (p *BlsCosi) Dispatch() error {
 			return err
 		}
 
-		p.FinalSignature <- append(signature, finalMask.Mask()...)
+		finalSig := append(signature, finalMask.Mask()...)
+		p.FinalSignature <- finalSig
 		log.Lvlf3("%v created final signature %x with mask %b", p.ServerIdentity(), signature, finalMask.Mask())
 
 		// Sign shutdown message
-		// TODO this is super vulnerable to replay attacks
-		shutdownSig, err = bls.Sign(p.suite, p.Private(), shutdownText)
+		rootSig, err := bls.Sign(p.suite, p.Private(), finalSig)
 		if err != nil {
 			return err
 		}
+		shutdownStruct = Shutdown{finalSig, rootSig}
 	}
 
-	p.sendShutdowns(shutdownSig)
+	p.sendShutdowns(shutdownStruct)
 
 	// We respond to every non-shutdown message with a shutdown message, to
 	// ensure that all nodes will shut down eventually. This is also the reason
@@ -222,7 +221,7 @@ func (p *BlsCosi) Dispatch() error {
 		case rumor := <-p.RumorsChan:
 			sender := rumor.TreeNode
 			log.Lvl5("Responding to rumor with shutdown", sender.Equal(p.TreeNode()))
-			p.sendShutdown(sender, shutdownSig)
+			p.sendShutdown(sender, shutdownStruct)
 		case <-p.ShutdownChan:
 			// ignore
 		case <-protocolTimeout:
@@ -267,7 +266,7 @@ func (p *BlsCosi) sendRumor(target *onet.TreeNode, responses ResponseMap) {
 }
 
 // sendShutdowns sends a shutdown message to some random peers.
-func (p *BlsCosi) sendShutdowns(shutdownSig []byte) {
+func (p *BlsCosi) sendShutdowns(shutdown Shutdown) {
 	targets, err := p.getRandomPeers(shutdownPeers)
 	if err != nil {
 		log.Lvl1("Couldn't get random peers:", err)
@@ -275,20 +274,28 @@ func (p *BlsCosi) sendShutdowns(shutdownSig []byte) {
 	}
 	log.Lvl5("Sending shutdowns")
 	for _, target := range targets {
-		p.sendShutdown(target, shutdownSig)
+		p.sendShutdown(target, shutdown)
 	}
 }
 
 // sendShutdown sends a shutdown message to a single peer.
-func (p *BlsCosi) sendShutdown(target *onet.TreeNode, shutdownSig []byte) {
-	p.SendTo(target, &Shutdown{shutdownSig})
+func (p *BlsCosi) sendShutdown(target *onet.TreeNode, shutdown Shutdown) {
+	p.SendTo(target, &shutdown)
 }
 
 // verifyShutdown verifies the legitimacy of a shutdown message.
-func (p *BlsCosi) verifyShutdown(msg ShutdownMessage) bool {
-	rootPublic := p.Publics()[0]
-	err := msg.ShutdownSig.Verify(p.suite, shutdownText, []kyber.Point{rootPublic})
-	return err == nil
+func (p *BlsCosi) verifyShutdown(msg ShutdownMessage) error {
+	rootPublic := p.Publics()[:1]
+	finalSig := msg.FinalCoSignature
+
+	// verify final signature
+	err := msg.FinalCoSignature.Verify(p.suite, p.Msg, p.Publics())
+	if err != nil {
+		return err
+	}
+
+	// verify root signature of final signature
+	return msg.RootSig.Verify(p.suite, finalSig, rootPublic)
 }
 
 // getRandomPeers returns a slice of random peers (not including self).
