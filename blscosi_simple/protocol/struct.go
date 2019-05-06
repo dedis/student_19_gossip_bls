@@ -19,7 +19,7 @@ import (
 const DefaultProtocolName = "simpleCoSiDefault"
 
 func init() {
-	network.RegisterMessages(&Rumor{}, &Response{}, &Stop{})
+	network.RegisterMessages(&Rumor{}, &Shutdown{}, &Response{}, &Stop{})
 }
 
 // ResponseMap is the container used to store responses coming from the children
@@ -109,7 +109,7 @@ func (sig BlsSignature) VerifyWithPolicy(ps pairing.Suite, msg []byte, publics [
 	return nil
 }
 
-// Response is a struct that can be sent in the gossip protocol
+// Rumor is a struct that can be sent in the gossip protocol
 type Rumor struct {
 	ResponseMap ResponseMap
 	Msg         []byte
