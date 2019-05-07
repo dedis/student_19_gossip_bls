@@ -95,7 +95,7 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 				}
 
 				switch msg.(type) {
-				case *protocol.Rumor:
+				case *protocol.Rumor, *protocol.Shutdown:
 					log.Lvl1("Ignoring blscosi message for simulation on ", config.Server.ServerIdentity)
 				default:
 					config.Overlay.Process(e)
