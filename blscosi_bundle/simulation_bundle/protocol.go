@@ -23,8 +23,8 @@ import (
 	"fmt"
 
 	"github.com/BurntSushi/toml"
-	blscosi "github.com/dedis/student_19_gossip_bls/blscosi_treebased"
-	"github.com/dedis/student_19_gossip_bls/blscosi_treebased/protocol"
+	blscosi "github.com/dedis/student_19_gossip_bls/blscosi_bundle"
+	"github.com/dedis/student_19_gossip_bls/blscosi_bundle/protocol"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
@@ -33,7 +33,7 @@ import (
 )
 
 func init() {
-	onet.SimulationRegister("BlsCosiTreebasedProtocol", NewSimulationProtocol)
+	onet.SimulationRegister("BlsCosiBundleProtocol", NewSimulationProtocol)
 }
 
 // SimulationProtocol implements onet.Simulation.
@@ -95,7 +95,7 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 				}
 
 				switch msg.(type) {
-				case *protocol.Rumor:
+				case *protocol.Rumor, *protocol.Shutdown:
 					log.Lvl1("Ignoring blscosi message for simulation on ", config.Server.ServerIdentity)
 				default:
 					config.Overlay.Process(e)

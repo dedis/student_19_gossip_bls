@@ -1,4 +1,4 @@
-package blscosi_treebased
+package blscosi_bundle
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ func TestClient_SignatureRequest(t *testing.T) {
 
 	// Send a request to the service to all hosts
 	client := NewClient()
-	msg := []byte("hello blscosi_treebased service")
+	msg := []byte("hello blscosi_bundle service")
 
 	_, err := client.SignatureRequest(&onet.Roster{}, msg)
 	require.Error(t, err)

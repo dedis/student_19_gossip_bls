@@ -16,7 +16,7 @@ import (
 
 const (
 	// BinaryName represents the Name of the binary
-	BinaryName = "blscosi_treebased"
+	BinaryName = "blscosi_bundle"
 
 	// Version of the binary
 	Version = "0.1.0"
@@ -36,7 +36,7 @@ func main() {
 
 func createApp() *cli.App {
 	cliApp := cli.NewApp()
-	cliApp.Name = "blscosi_treebased"
+	cliApp.Name = "blscosi_bundle"
 	cliApp.Usage = "collectively sign or verify a file; run a server for collective signing"
 	cliApp.Version = Version
 	binaryFlags := []cli.Flag{

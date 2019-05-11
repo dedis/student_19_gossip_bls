@@ -16,10 +16,10 @@ import (
 // DefaultProtocolName can be used from other packages to refer to this protocol.
 // If this name is used, then the suite used to verify signatures must be
 // the default cothority.Suite.
-const DefaultProtocolName = "treebasedCoSiDefault"
+const DefaultProtocolName = "bundleCoSiDefault"
 
 func init() {
-	network.RegisterMessages(&Rumor{}, &Response{}, &Stop{})
+	network.RegisterMessages(&Rumor{}, &Shutdown{}, &Response{}, &Stop{})
 }
 
 // ResponseMap is the container used to store responses coming from the children
@@ -109,7 +109,7 @@ func (sig BlsSignature) VerifyWithPolicy(ps pairing.Suite, msg []byte, publics [
 	return nil
 }
 
-// Response is a struct that can be sent in the gossip protocol
+// Rumor is a struct that can be sent in the gossip protocol
 type Rumor struct {
 	ResponseMap ResponseMap
 	Msg         []byte
@@ -123,8 +123,13 @@ type RumorMessage struct {
 }
 
 // Shutdown is a struct that can be sent in the gossip protocol
+// A valid shutdown message must contain a proof that the root has seen a valid
+// final signature. This is to prevent faked shutdown messages that take down the
+// gossip protocol. Thus the shutdown message contains the final signature,
+// which in turn is signed by root.
 type Shutdown struct {
-	ShutdownSig BlsSignature
+	FinalCoSignature BlsSignature
+	RootSig          BlsSignature
 }
 
 // ShutdownMessage just contains a Shutdown and the data necessary to identify

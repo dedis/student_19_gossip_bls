@@ -21,9 +21,9 @@ import (
 	"reflect"
 
 	// Services that will be compiled in.
+	_ "github.com/dedis/student_19_gossip_bls/blscosi_bundle"
 	_ "github.com/dedis/student_19_gossip_bls/blscosi_naive"
 	_ "github.com/dedis/student_19_gossip_bls/blscosi_simple"
-	_ "github.com/dedis/student_19_gossip_bls/blscosi_treebased"
 	_ "go.dedis.ch/cothority/v3/authprox"
 	_ "go.dedis.ch/cothority/v3/byzcoin"
 	_ "go.dedis.ch/cothority/v3/byzcoin/contracts"

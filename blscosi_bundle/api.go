@@ -1,4 +1,4 @@
-package blscosi_treebased
+package blscosi_bundle
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ type Client struct {
 	*onet.Client
 }
 
-// NewClient instantiates a new blscosi_treebased.Client
+// NewClient instantiates a new blscosi_bundle.Client
 func NewClient() *Client {
 	return &Client{Client: onet.NewClient(suite, ServiceName)}
 }

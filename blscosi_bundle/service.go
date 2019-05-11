@@ -1,12 +1,12 @@
-// Package blscosi_treebased implements a service and client that provides an API
+// Package blscosi_bundle implements a service and client that provides an API
 // to request a signature to a cothority
-package blscosi_treebased
+package blscosi_bundle
 
 import (
 	"errors"
 	"time"
 
-	"github.com/dedis/student_19_gossip_bls/blscosi_treebased/protocol"
+	"github.com/dedis/student_19_gossip_bls/blscosi_bundle/protocol"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/suites"
 	"go.dedis.ch/onet/v3"
@@ -22,7 +22,7 @@ var suite = suites.MustFind("bn256.adapter").(*pairing.SuiteBn256)
 var ServiceID onet.ServiceID
 
 // ServiceName is the name to refer to the CoSi service
-const ServiceName = "treebasedCoSiService"
+const ServiceName = "bundleCoSiService"
 
 func init() {
 	ServiceID, _ = onet.RegisterNewServiceWithSuite(ServiceName, suite, newCoSiService)
