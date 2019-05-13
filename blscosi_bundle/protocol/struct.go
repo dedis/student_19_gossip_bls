@@ -104,7 +104,7 @@ func (sig BlsSignature) VerifyAggregateWithPolicy(suite pairing.Suite, msg []byt
 
 	err = bdn.Verify(suite, aggKey, msg, rawSig)
 	if err != nil {
-		return fmt.Errorf("didn't get a valid signature: %s", err)
+		return fmt.Errorf("didn't get a valid aggregate signature: %s", err)
 	}
 
 	log.Lvl3("Signature verified and is correct!")

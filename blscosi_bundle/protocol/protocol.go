@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -422,7 +423,18 @@ func (p *BlsCosi) generateSignature(responses ResponseMap) (kyber.Point, *sign.M
 		return nil, nil, err
 	}
 
-	for _, res := range responses {
+	// TODO: this is ugly and needs to be fixed when the issue with protobuf decoding maps is figured out
+	var keys []int
+	for k := range responses {
+		val, err := strconv.Atoi(k)
+		if err != nil {
+			return nil, nil, err
+		}
+		keys = append(keys, val)
+	}
+	sort.Ints(keys)
+	for _, k := range keys {
+		res := responses[strconv.Itoa(k)]
 		sigs = append(sigs, res.Signature)
 		err := aggMask.Merge(res.Mask)
 		if err != nil {
