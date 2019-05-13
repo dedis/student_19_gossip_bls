@@ -21,6 +21,8 @@ In the Node-method you can read the files that have been created by the
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	blscosi "github.com/dedis/student_19_gossip_bls/blscosi_bundle"
@@ -40,6 +42,8 @@ func init() {
 type SimulationProtocol struct {
 	onet.SimulationBFTree
 	FailingLeaves int
+	MinDelay      float64
+	MaxDelay      float64
 }
 
 // NewSimulationProtocol is used internally to register the simulation (see the init()
@@ -105,6 +109,29 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 			break // this node has been found
 		}
 	}
+
+	if s.MaxDelay > 0 {
+		// delay announcements
+		config.Server.RegisterProcessorFunc(onet.ProtocolMsgID, func(e *network.Envelope) error {
+			//get message
+			_, msg, err := network.Unmarshal(e.Msg.(*onet.ProtocolMsg).MsgSlice, config.Server.Suite())
+			if err != nil {
+				log.Fatal("error while unmarshaling a message:", err)
+				return err
+			}
+
+			switch msg.(type) {
+			case *protocol.Rumor, *protocol.Shutdown:
+				sleepSecs := rand.Float64()*(s.MaxDelay-s.MinDelay) + s.MinDelay
+				sleepNsecs := sleepSecs * float64(time.Second/time.Nanosecond)
+				log.Lvlf1("Delaying message by %.3f for simulation on %v", sleepSecs, config.Server.ServerIdentity)
+				time.Sleep(time.Duration(sleepNsecs))
+			}
+			config.Overlay.Process(e)
+			return nil
+		})
+	}
+
 	log.Lvl3("Initializing node-index", index)
 	return s.SimulationBFTree.Node(config)
 }
