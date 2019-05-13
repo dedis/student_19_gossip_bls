@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +26,8 @@ const gossipTick = 100 * time.Millisecond
 
 const rumorPeers = 2    // number of peers that a rumor message is sent to
 const shutdownPeers = 2 // number of peers that the shutdown message is sent to
+
+const treeMode = false
 
 // VerificationFn is called on every node. Where msg is the message that is
 // co-signed and the data is additional data for verification.
@@ -146,10 +149,10 @@ func (p *BlsCosi) Dispatch() error {
 
 		// Add own signature.
 		// If we aren't root, we don't yet know what the message is.
-		/*err := p.trySign(responses)
+		err := p.trySign(responses)
 		if err != nil {
 			return err
-		}*/
+		}
 	}
 
 	log.Lvlf3("Gossip protocol started at node %v", p.ServerIdentity())
@@ -165,10 +168,10 @@ func (p *BlsCosi) Dispatch() error {
 	for !shutdown {
 		select {
 		case rumor := <-p.RumorsChan:
-			updateResponses(responses, rumor.ResponseMap)
+			updateResponses(responses, rumor.ResponseMap, len(p.Publics()))
 			log.Lvlf5("Incoming rumor, %d known, %d needed, is-root %v",
 				len(responses), p.Threshold, p.IsRoot())
-			if p.IsRoot() && len(responses) >= p.Threshold {
+			if p.IsRoot() && p.isEnough(responses) {
 				// We've got all the signatures.
 				shutdown = true
 			}
@@ -334,6 +337,20 @@ func verify(suite pairing.Suite, sig []byte, msg []byte, public kyber.Point) err
 	return nil
 }
 
+// isEnough returns true if we have enough responses.
+func (p *BlsCosi) isEnough(responses ResponseMap) bool {
+	if !treeMode {
+		return len(responses) >= p.Threshold
+	}
+	count := 0
+	for key, res := range responses {
+		if res != nil {
+			count += len(strings.Split(key, "$"))
+		}
+	}
+	return count >= p.Threshold
+}
+
 // getRandomPeers returns a slice of random peers (not including self).
 func (p *BlsCosi) getRandomPeers(numTargets int) ([]*onet.TreeNode, error) {
 	self := p.TreeNode()
@@ -476,7 +493,12 @@ func (p *BlsCosi) makeResponse() (*Response, uint32, error) {
 }
 
 // updateResponses updates the first map with the content from the second map.
-func updateResponses(responses ResponseMap, newResponses ResponseMap) {
+func updateResponses(responses ResponseMap, newResponses ResponseMap, nodes int) {
+	if treeMode {
+		updateResponsesTree(responses, newResponses, nodes)
+		return
+	}
+
 	for key, response := range newResponses {
 		responses[key] = response
 	}
