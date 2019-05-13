@@ -425,7 +425,6 @@ func (p *BlsCosi) generateSignature(responses ResponseMap) (kyber.Point, *cosi.M
 // Sign the message and pack it with the mask as a response
 func (p *BlsCosi) makeResponse() (*Response, error) {
 	mask, err := cosi.NewMask(p.suite, p.Publics(), p.Public())
-	log.Lvlf1("%v pk %v pk %v", p.Publics(), p.Public(), p.Msg)
 	if err != nil {
 		log.Error(err)
 		return nil, err

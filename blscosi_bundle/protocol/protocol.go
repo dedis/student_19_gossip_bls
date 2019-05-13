@@ -6,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"time"
 
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/sign/bls"
-	"go.dedis.ch/kyber/v3/sign/cosi"
+	"go.dedis.ch/kyber/v3/sign"
+	"go.dedis.ch/kyber/v3/sign/bdn"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 )
@@ -108,6 +109,20 @@ func (p *BlsCosi) Shutdown() error {
 	return nil
 }
 
+// Start is done only by root and starts the protocol.
+// It also verifies that the protocol has been correctly parameterized.
+func (p *BlsCosi) Start() error {
+	err := p.checkIntegrity()
+	if err != nil {
+		p.Done()
+		return err
+	}
+
+	log.Lvlf3("Starting BLS CoSi on %v", p.ServerIdentity())
+	p.startChan <- true
+	return nil
+}
+
 // Dispatch is the main method of the protocol for all nodes.
 func (p *BlsCosi) Dispatch() error {
 	defer p.Done()
@@ -130,10 +145,10 @@ func (p *BlsCosi) Dispatch() error {
 
 		// Add own signature.
 		// If we aren't root, we don't yet know what the message is.
-		err := p.trySign(responses)
+		/*err := p.trySign(responses)
 		if err != nil {
 			return err
-		}
+		}*/
 	}
 
 	log.Lvlf3("Gossip protocol started at node %v", p.ServerIdentity())
@@ -158,6 +173,8 @@ func (p *BlsCosi) Dispatch() error {
 			}
 
 			if len(p.Msg) == 0 && len(rumor.Msg) > 0 {
+				// Copy bytes due to the way protobuf allows the bytes to be
+				// shared with the underlying buffer
 				p.Msg = rumor.Msg[:]
 				// Add own signature.
 				err := p.trySign(responses)
@@ -200,11 +217,11 @@ func (p *BlsCosi) Dispatch() error {
 		}
 
 		finalSig := append(signature, finalMask.Mask()...)
-		p.FinalSignature <- finalSig
 		log.Lvlf3("%v created final signature %x with mask %b", p.ServerIdentity(), signature, finalMask.Mask())
+		p.FinalSignature <- finalSig
 
 		// Sign shutdown message
-		rootSig, err := bls.Sign(p.suite, p.Private(), finalSig)
+		rootSig, err := bdn.Sign(p.suite, p.Private(), finalSig)
 		if err != nil {
 			return err
 		}
@@ -234,22 +251,22 @@ func (p *BlsCosi) Dispatch() error {
 }
 
 func (p *BlsCosi) trySign(responses ResponseMap) error {
-	if p.verificationFn(p.Msg, p.Data) {
-		own, err := p.makeResponse()
-		if err != nil {
-			return err
-		}
-		responses[p.Public().String()] = own
-		log.Lvlf4("Node %v signed", p.ServerIdentity())
-	} else {
+	if !p.verificationFn(p.Msg, p.Data) {
 		log.Lvlf4("Node %v refused to sign", p.ServerIdentity())
+		return nil
 	}
+	own, idx, err := p.makeResponse()
+	if err != nil {
+		return err
+	}
+	responses[strconv.Itoa(int(idx))] = own
+	log.Lvlf4("Node %v signed", p.ServerIdentity())
 	return nil
 }
 
 // sendRumors sends a rumor message to some peers.
 func (p *BlsCosi) sendRumors(responses ResponseMap) {
-	targets, err := p.getRandomPeers(shutdownPeers)
+	targets, err := p.getRandomPeers(rumorPeers)
 	if err != nil {
 		log.Lvl1("Couldn't get random peers:", err)
 		return
@@ -269,7 +286,7 @@ func (p *BlsCosi) sendRumor(target *onet.TreeNode, responses ResponseMap) {
 func (p *BlsCosi) sendShutdowns(shutdown Shutdown) {
 	targets, err := p.getRandomPeers(shutdownPeers)
 	if err != nil {
-		log.Lvl1("Couldn't get random peers:", err)
+		log.Lvl1("Couldn't get random peers for shutdown:", err)
 		return
 	}
 	log.Lvl5("Sending shutdowns")
@@ -285,17 +302,35 @@ func (p *BlsCosi) sendShutdown(target *onet.TreeNode, shutdown Shutdown) {
 
 // verifyShutdown verifies the legitimacy of a shutdown message.
 func (p *BlsCosi) verifyShutdown(msg ShutdownMessage) error {
-	rootPublic := p.Publics()[:1]
+	if len(p.Publics()) == 0 {
+		return errors.New("Roster is empty")
+	}
+	rootPublic := p.Publics()[0]
 	finalSig := msg.FinalCoSignature
 
 	// verify final signature
-	err := msg.FinalCoSignature.Verify(p.suite, p.Msg, p.Publics())
+	err := msg.FinalCoSignature.VerifyAggregate(p.suite, p.Msg, p.Publics())
 	if err != nil {
 		return err
 	}
 
 	// verify root signature of final signature
-	return msg.RootSig.Verify(p.suite, finalSig, rootPublic)
+	return verify(p.suite, msg.RootSig, finalSig, rootPublic)
+}
+
+// verify checks the signature over the message with a single key
+func verify(suite pairing.Suite, sig []byte, msg []byte, public kyber.Point) error {
+	if len(msg) == 0 {
+		return errors.New("no message provided to Verify()")
+	}
+	if len(sig) == 0 {
+		return errors.New("no signature provided to Verify()")
+	}
+	err := bdn.Verify(suite, public, msg, sig)
+	if err != nil {
+		return fmt.Errorf("didn't get a valid signature: %s", err)
+	}
+	return nil
 }
 
 // getRandomPeers returns a slice of random peers (not including self).
@@ -343,20 +378,6 @@ func (p *BlsCosi) getRandomPeer() (*onet.TreeNode, error) {
 	return peers[0], nil
 }
 
-// Start is done only by root and starts the protocol.
-// It also verifies that the protocol has been correctly parameterized.
-func (p *BlsCosi) Start() error {
-	err := p.checkIntegrity()
-	if err != nil {
-		p.Done()
-		return err
-	}
-
-	log.Lvlf3("Starting BLS CoSi on %v", p.ServerIdentity())
-	p.startChan <- true
-	return nil
-}
-
 // checkIntegrity checks if the protocol has been instantiated with
 // correct parameters
 func (p *BlsCosi) checkIntegrity() error {
@@ -390,56 +411,56 @@ func (p *BlsCosi) checkFailureThreshold(numFailure int) bool {
 
 // generateSignature aggregates all the signatures in responses.
 // Also aggregates the bitmasks.
-func (p *BlsCosi) generateSignature(responses ResponseMap) (kyber.Point, *cosi.Mask, error) {
+func (p *BlsCosi) generateSignature(responses ResponseMap) (kyber.Point, *sign.Mask, error) {
 	for k, r := range responses {
 		log.Lvlf5("generating signature from %v %v", k, r)
 	}
 
-	// Aggregate all signatures
-	response, err := makeAggregateResponse(p.suite, p.Publics(), responses)
-	if err != nil {
-		log.Lvlf3("%v failed to create aggregate signature", p.ServerIdentity())
-		return nil, nil, err
-	}
-	log.Lvlf5("generated signature %v", response)
-
-	//create final aggregated mask
-	finalMask, err := cosi.NewMask(p.suite, p.Publics(), nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = finalMask.SetMask(response.Mask)
+	var sigs [][]byte
+	aggMask, err := sign.NewMask(p.suite, p.Publics(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	finalSignature, err := response.Signature.Point(p.suite)
+	for _, res := range responses {
+		sigs = append(sigs, res.Signature)
+		err := aggMask.Merge(res.Mask)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	aggSig, err := bdn.AggregateSignatures(p.suite, sigs, aggMask)
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Lvlf3("%v is done aggregating signatures with total of %d signatures", p.ServerIdentity(), finalMask.CountEnabled())
+	log.Lvlf3("%v is done aggregating signatures with total of %d signatures", p.ServerIdentity(), aggMask.CountEnabled())
 
-	return finalSignature, finalMask, err
+	return aggSig, aggMask, err
 }
 
 // Sign the message and pack it with the mask as a response
-func (p *BlsCosi) makeResponse() (*Response, error) {
-	mask, err := cosi.NewMask(p.suite, p.Publics(), p.Public())
-	log.Lvlf1("%v pk %v pk %v", p.Publics(), p.Public(), p.Msg)
+// idx is this node's index
+func (p *BlsCosi) makeResponse() (*Response, uint32, error) {
+	mask, err := sign.NewMask(p.suite, p.Publics(), p.Public())
 	if err != nil {
-		log.Error(err)
-		return nil, err
+		return nil, 0, err
 	}
 
-	sig, err := bls.Sign(p.suite, p.Private(), p.Msg)
+	idx := uint32(mask.IndexOfNthEnabled(0)) // The only set bit is this node's
+	if idx < 0 {
+		return nil, 0, errors.New("Couldn't find own index")
+	}
+
+	sig, err := bdn.Sign(p.suite, p.Private(), p.Msg)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	return &Response{
 		Mask:      mask.Mask(),
 		Signature: sig,
-	}, nil
+	}, idx, nil
 }
 
 // updateResponses updates the first map with the content from the second map.

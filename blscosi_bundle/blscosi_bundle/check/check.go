@@ -157,7 +157,7 @@ func SignStatement(msg []byte, ro *onet.Roster) (*blscosi_bundle.SignatureRespon
 	case response := <-pchan:
 		log.Lvlf5("Response: %x", response.Signature)
 
-		err := response.Signature.Verify(client.Suite().(*pairing.SuiteBn256), msg[:], publics)
+		err := response.Signature.VerifyAggregate(client.Suite().(*pairing.SuiteBn256), msg[:], publics)
 		if err != nil {
 			return nil, err
 		}
@@ -185,7 +185,7 @@ func VerifySignatureHash(b []byte, sig *blscosi_bundle.SignatureResponse, ro *on
 			"doesn't match with the hash of the file.)")
 	}
 
-	if err := sig.Signature.Verify(suite, b, publics); err != nil {
+	if err := sig.Signature.VerifyAggregate(suite, b, publics); err != nil {
 		return errors.New("Invalid sig:" + err.Error())
 	}
 	return nil

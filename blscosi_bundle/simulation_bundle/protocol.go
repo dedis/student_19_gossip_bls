@@ -138,7 +138,7 @@ func (s *SimulationProtocol) Run(config *onet.SimulationConfig) error {
 		suite := client.Suite().(pairing.Suite)
 		publics := config.Roster.ServicePublics(blscosi.ServiceName)
 
-		err = serviceReply.Signature.Verify(suite, proposal, publics)
+		err = serviceReply.Signature.VerifyAggregate(suite, proposal, publics)
 		if err != nil {
 			return fmt.Errorf("error while verifying signature:%s", err)
 		}

@@ -6,8 +6,8 @@ import (
 
 	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/kyber/v3/sign/bls"
-	"go.dedis.ch/kyber/v3/sign/cosi"
+	"go.dedis.ch/kyber/v3/sign"
+	"go.dedis.ch/kyber/v3/sign/bdn"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -30,27 +30,31 @@ type BlsSignature []byte
 
 // GetMask creates and returns the mask associated with the signature. If
 // no mask has been appended, mask with every bit enabled is assumed
-func (sig BlsSignature) GetMask(suite pairing.Suite, publics []kyber.Point) (*cosi.Mask, error) {
-	mask, err := cosi.NewMask(suite.(cosi.Suite), publics, nil)
+func (sig BlsSignature) GetMask(suite pairing.Suite, publics []kyber.Point) (*sign.Mask, error) {
+	mask, err := sign.NewMask(suite, publics, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	lenCom := suite.G1().PointLen()
-	bits := sig[lenCom:]
+	if len(sig) < lenCom {
+		return nil, errors.New("signature too short to get mask")
+	}
 
-	if len(bits) == 0 {
-		for i := 0; i < mask.Len(); i++ {
-			mask.SetBit(i, true)
-		}
-	} else {
-		err := mask.SetMask(sig[lenCom:])
-		if err != nil {
-			return mask, err
-		}
+	err = mask.SetMask(sig[lenCom:])
+	if err != nil {
+		return nil, err
 	}
 
 	return mask, nil
+}
+
+func (sig BlsSignature) RawSignature(suite pairing.Suite) ([]byte, error) {
+	lenCom := suite.G1().PointLen()
+	if len(sig) < lenCom {
+		return nil, errors.New("signature too short")
+	}
+	return sig[:lenCom], nil
 }
 
 // Point creates the point associated with the signature in G1
@@ -64,37 +68,41 @@ func (sig BlsSignature) Point(suite pairing.Suite) (kyber.Point, error) {
 	return pointSig, nil
 }
 
-// Verify checks the signature over the message using the public keys and a default policy
-func (sig BlsSignature) Verify(ps pairing.Suite, msg []byte, publics []kyber.Point) error {
-	policy := cosi.NewThresholdPolicy(DefaultThreshold(len(publics)))
-
-	return sig.VerifyWithPolicy(ps, msg, publics, policy)
+// VerifyAggregate checks the signature over the message using the public keys and a default policy
+func (sig BlsSignature) VerifyAggregate(suite pairing.Suite, msg []byte, publics []kyber.Point) error {
+	policy := sign.NewThresholdPolicy(DefaultThreshold(len(publics)))
+	return sig.VerifyAggregateWithPolicy(suite, msg, publics, policy)
 }
 
-// VerifyWithPolicy checks the signature over the message using the given public keys and policy
-func (sig BlsSignature) VerifyWithPolicy(ps pairing.Suite, msg []byte, publics []kyber.Point, policy cosi.Policy) error {
-	if publics == nil || len(publics) == 0 {
+// VerifyAggregateWithPolicy checks the signature over the message using the given public keys and policy
+func (sig BlsSignature) VerifyAggregateWithPolicy(suite pairing.Suite, msg []byte, publics []kyber.Point, policy sign.Policy) error {
+	if len(publics) == 0 {
 		return errors.New("no public keys provided")
 	}
 	if msg == nil {
 		return errors.New("no message provided")
 	}
-	if sig == nil || len(sig) == 0 {
-		return errors.New("no signature provided")
-	}
 
-	lenCom := ps.G1().PointLen()
-	signature := sig[:lenCom]
-
-	log.Lvlf5("Verifying against %v", signature)
-
-	// Unpack the participation mask and get the aggregate public key
-	mask, err := sig.GetMask(ps, publics)
+	rawSig, err := sig.RawSignature(suite)
 	if err != nil {
 		return err
 	}
 
-	err = bls.Verify(ps, mask.AggregatePublic, msg, signature)
+	// Unpack the participation mask
+	mask, err := sig.GetMask(suite, publics)
+	if err != nil {
+		return err
+	}
+
+	log.Lvlf5("Verifying against %v", rawSig)
+
+	// get the aggregate public key
+	aggKey, err := bdn.AggregatePublicKeys(suite, mask)
+	if err != nil {
+		return err
+	}
+
+	err = bdn.Verify(suite, aggKey, msg, rawSig)
 	if err != nil {
 		return fmt.Errorf("didn't get a valid signature: %s", err)
 	}
@@ -129,7 +137,7 @@ type RumorMessage struct {
 // which in turn is signed by root.
 type Shutdown struct {
 	FinalCoSignature BlsSignature
-	RootSig          BlsSignature
+	RootSig          []byte
 }
 
 // ShutdownMessage just contains a Shutdown and the data necessary to identify
