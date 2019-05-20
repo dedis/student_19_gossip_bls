@@ -6,9 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,12 +19,6 @@ import (
 
 const defaultTimeout = 10 * time.Second
 const shutdownAfter = 11 * time.Second // finally truly shutdown the protocol
-const gossipTick = 100 * time.Millisecond
-
-const rumorPeers = 2    // number of peers that a rumor message is sent to
-const shutdownPeers = 2 // number of peers that the shutdown message is sent to
-
-const treeMode = false
 
 // VerificationFn is called on every node. Where msg is the message that is
 // co-signed and the data is additional data for verification.
@@ -56,6 +47,7 @@ type BlsCosi struct {
 	startChan      chan bool
 	verificationFn VerificationFn
 	suite          *pairing.SuiteBn256
+	Params         Parameters // mainly for simulations
 
 	// internodes channels
 	RumorsChan   chan RumorMessage
@@ -133,8 +125,16 @@ func (p *BlsCosi) Dispatch() error {
 
 	protocolTimeout := time.After(shutdownAfter)
 
-	// responses is a map where we collect all signatures.
-	responses := make(ResponseMap)
+	log.Lvlf3("Gossip protocol started at node %v", p.ServerIdentity())
+
+	var shutdownStruct Shutdown
+
+	// When `shutdown` is true, we'll initiate a "soft shutdown": the protocol
+	// stays alive here on this node, but no more rumor messages are sent.
+	shutdown := false
+	done := false
+
+	var rumor *Rumor
 
 	// The root must wait for Start() to have been called.
 	if p.IsRoot() {
@@ -146,45 +146,75 @@ func (p *BlsCosi) Dispatch() error {
 		case <-time.After(time.Second):
 			return errors.New("timeout, did you forget to call Start?")
 		}
-
-		// Add own signature.
-		// If we aren't root, we don't yet know what the message is.
-		err := p.trySign(responses)
-		if err != nil {
-			return err
+	} else {
+		select {
+		case rumorMsg := <-p.RumorsChan:
+			rumor = &rumorMsg.Rumor
+			p.Params = rumor.Params
+			// Copy bytes due to the way protobuf allows the bytes to be
+			// shared with the underlying buffer
+			p.Msg = rumor.Msg[:]
+		case shutdownMsg := <-p.ShutdownChan:
+			p.Params = shutdownMsg.Params
+			p.Msg = shutdownMsg.Msg[:]
+			log.Lvl5("Received shutdown")
+			if err := p.verifyShutdown(shutdownMsg); err == nil {
+				shutdownStruct = shutdownMsg.Shutdown
+				shutdown = true
+			} else {
+				log.Lvl1("Got first spoofed shutdown:", err)
+				// Don't take any action
+			}
+		case <-protocolTimeout:
+			shutdown = true
+			done = true
 		}
 	}
 
-	log.Lvlf3("Gossip protocol started at node %v", p.ServerIdentity())
+	// responses is a map where we collect all signatures.
+	var responses Responses
+	if p.Params.TreeMode {
+		var err error
+		responses, err = NewTreeResponses(p.suite, p.Publics())
+		if err != nil {
+			log.Lvl1("Failed to make TreeResponses")
+			return err
+		}
+	} else {
+		responses = make(SimpleResponses)
+	}
 
-	ticker := time.NewTicker(gossipTick)
+	// Add own signature.
+	err := p.trySign(responses)
+	if err != nil {
+		return err
+	}
 
-	var shutdownStruct Shutdown
+	if rumor != nil {
+		err = responses.Update(rumor.ResponseMap)
+		if err != nil {
+			return err
+		}
+		log.Lvlf5("Incoming first rumor, %d known, %d needed",
+			responses.Count(), p.Threshold)
+	}
 
-	// When `shutdown` is true, we'll initiate a "soft shutdown": the protocol
-	// stays alive here on this node, but no more rumor messages are sent.
-	shutdown := false
-	done := false
+	ticker := time.NewTicker(p.Params.GossipTick)
 	for !shutdown {
 		select {
 		case rumor := <-p.RumorsChan:
-			updateResponses(responses, rumor.ResponseMap, len(p.Publics()))
+			err = responses.Update(rumor.ResponseMap)
+			if err != nil {
+				return err
+			}
 			log.Lvlf5("Incoming rumor, %d known, %d needed, is-root %v",
-				len(responses), p.Threshold, p.IsRoot())
+				responses.Count(), p.Threshold, p.IsRoot())
 			if p.IsRoot() && p.isEnough(responses) {
 				// We've got all the signatures.
+				res := responses.(TreeResponses)
+				log.Lvl5("Got all the signatures",
+					res.mask.CountEnabled(), res.responses, res.mask.Mask())
 				shutdown = true
-			}
-
-			if len(p.Msg) == 0 && len(rumor.Msg) > 0 {
-				// Copy bytes due to the way protobuf allows the bytes to be
-				// shared with the underlying buffer
-				p.Msg = rumor.Msg[:]
-				// Add own signature.
-				err := p.trySign(responses)
-				if err != nil {
-					return err
-				}
 			}
 		case shutdownMsg := <-p.ShutdownChan:
 			log.Lvl5("Received shutdown")
@@ -193,6 +223,7 @@ func (p *BlsCosi) Dispatch() error {
 				shutdown = true
 			} else {
 				log.Lvl1("Got spoofed shutdown:", err)
+				log.Lvl3("Length was:", len(shutdownMsg.FinalCoSignature))
 				// Don't take any action
 			}
 		case <-ticker.C:
@@ -209,8 +240,9 @@ func (p *BlsCosi) Dispatch() error {
 	if p.IsRoot() {
 		log.Lvl3(p.ServerIdentity().Address, "collected all signature responses")
 
+		log.Lvlf3("%v is aggregating signatures", p.ServerIdentity())
 		// generate root signature
-		signaturePoint, finalMask, err := p.generateSignature(responses)
+		signaturePoint, finalMask, err := responses.Aggregate(p.suite, p.Publics())
 		if err != nil {
 			return err
 		}
@@ -229,7 +261,7 @@ func (p *BlsCosi) Dispatch() error {
 		if err != nil {
 			return err
 		}
-		shutdownStruct = Shutdown{finalSig, rootSig}
+		shutdownStruct = Shutdown{p.Params, finalSig, rootSig, p.Msg}
 	}
 
 	p.sendShutdowns(shutdownStruct)
@@ -254,7 +286,7 @@ func (p *BlsCosi) Dispatch() error {
 	return nil
 }
 
-func (p *BlsCosi) trySign(responses ResponseMap) error {
+func (p *BlsCosi) trySign(responses Responses) error {
 	if !p.verificationFn(p.Msg, p.Data) {
 		log.Lvlf4("Node %v refused to sign", p.ServerIdentity())
 		return nil
@@ -263,14 +295,14 @@ func (p *BlsCosi) trySign(responses ResponseMap) error {
 	if err != nil {
 		return err
 	}
-	responses[strconv.Itoa(int(idx))] = own
+	responses.Add(idx, own)
 	log.Lvlf4("Node %v signed", p.ServerIdentity())
 	return nil
 }
 
 // sendRumors sends a rumor message to some peers.
-func (p *BlsCosi) sendRumors(responses ResponseMap) {
-	targets, err := p.getRandomPeers(rumorPeers)
+func (p *BlsCosi) sendRumors(responses Responses) {
+	targets, err := p.getRandomPeers(p.Params.RumorPeers)
 	if err != nil {
 		log.Lvl1("Couldn't get random peers:", err)
 		return
@@ -282,13 +314,13 @@ func (p *BlsCosi) sendRumors(responses ResponseMap) {
 }
 
 // sendRumor sends the given signatures to a random peer.
-func (p *BlsCosi) sendRumor(target *onet.TreeNode, responses ResponseMap) {
-	p.SendTo(target, &Rumor{responses, p.Msg})
+func (p *BlsCosi) sendRumor(target *onet.TreeNode, responses Responses) {
+	p.SendTo(target, &Rumor{p.Params, responses.Map(), p.Msg})
 }
 
 // sendShutdowns sends a shutdown message to some random peers.
 func (p *BlsCosi) sendShutdowns(shutdown Shutdown) {
-	targets, err := p.getRandomPeers(shutdownPeers)
+	targets, err := p.getRandomPeers(p.Params.ShutdownPeers)
 	if err != nil {
 		log.Lvl1("Couldn't get random peers for shutdown:", err)
 		return
@@ -338,17 +370,8 @@ func verify(suite pairing.Suite, sig []byte, msg []byte, public kyber.Point) err
 }
 
 // isEnough returns true if we have enough responses.
-func (p *BlsCosi) isEnough(responses ResponseMap) bool {
-	if !treeMode {
-		return len(responses) >= p.Threshold
-	}
-	count := 0
-	for key, res := range responses {
-		if res != nil {
-			count += len(strings.Split(key, "$"))
-		}
-	}
-	return count >= p.Threshold
+func (p *BlsCosi) isEnough(responses Responses) bool {
+	return responses.Count() >= p.Threshold
 }
 
 // getRandomPeers returns a slice of random peers (not including self).
@@ -427,56 +450,15 @@ func (p *BlsCosi) checkFailureThreshold(numFailure int) bool {
 	return numFailure > len(p.Roster().List)-p.Threshold
 }
 
-// generateSignature aggregates all the signatures in responses.
-// Also aggregates the bitmasks.
-func (p *BlsCosi) generateSignature(responses ResponseMap) (kyber.Point, *sign.Mask, error) {
-	for k, r := range responses {
-		log.Lvlf5("generating signature from %v %v", k, r)
-	}
-
-	var sigs [][]byte
-	aggMask, err := sign.NewMask(p.suite, p.Publics(), nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// TODO: this is ugly and needs to be fixed when the issue with protobuf decoding maps is figured out
-	var keys []int
-	for k := range responses {
-		val, err := strconv.Atoi(k)
-		if err != nil {
-			return nil, nil, err
-		}
-		keys = append(keys, val)
-	}
-	sort.Ints(keys)
-	for _, k := range keys {
-		res := responses[strconv.Itoa(k)]
-		sigs = append(sigs, res.Signature)
-		err := aggMask.Merge(res.Mask)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	aggSig, err := bdn.AggregateSignatures(p.suite, sigs, aggMask)
-	if err != nil {
-		return nil, nil, err
-	}
-	log.Lvlf3("%v is done aggregating signatures with total of %d signatures", p.ServerIdentity(), aggMask.CountEnabled())
-
-	return aggSig, aggMask, err
-}
-
 // Sign the message and pack it with the mask as a response
 // idx is this node's index
-func (p *BlsCosi) makeResponse() (*Response, uint32, error) {
+func (p *BlsCosi) makeResponse() (*Response, int, error) {
 	mask, err := sign.NewMask(p.suite, p.Publics(), p.Public())
 	if err != nil {
 		return nil, 0, err
 	}
 
-	idx := uint32(mask.IndexOfNthEnabled(0)) // The only set bit is this node's
+	idx := mask.IndexOfNthEnabled(0) // The only set bit is this node's
 	if idx < 0 {
 		return nil, 0, errors.New("Couldn't find own index")
 	}
@@ -490,16 +472,4 @@ func (p *BlsCosi) makeResponse() (*Response, uint32, error) {
 		Mask:      mask.Mask(),
 		Signature: sig,
 	}, idx, nil
-}
-
-// updateResponses updates the first map with the content from the second map.
-func updateResponses(responses ResponseMap, newResponses ResponseMap, nodes int) {
-	if treeMode {
-		updateResponsesTree(responses, newResponses, nodes)
-		return
-	}
-
-	for key, response := range newResponses {
-		responses[key] = response
-	}
 }

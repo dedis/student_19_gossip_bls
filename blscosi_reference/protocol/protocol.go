@@ -338,7 +338,7 @@ func (p *BlsCosi) collectSignatures() (ResponseMap, error) {
 	}
 
 	// handle answers from all parallel threads
-	responseMap := make(ResponseMap)
+	ResponseMap := make(ResponseMap)
 	numSignature := 0
 	numFailure := 0
 	timeout := time.After(p.Timeout)
@@ -357,11 +357,11 @@ func (p *BlsCosi) collectSignatures() (ResponseMap, error) {
 
 			public := searchPublicKey(p.TreeNodeInstance, res.ServerIdentity)
 			if public != nil {
-				if _, ok := responseMap[public.String()]; !ok {
+				if _, ok := ResponseMap[public.String()]; !ok {
 					numSignature += mask.CountEnabled()
 					numFailure += res.SubtreeCount() + 1 - mask.CountEnabled()
 
-					responseMap[public.String()] = &res.Response
+					ResponseMap[public.String()] = &res.Response
 				}
 			}
 		case err := <-errChan:
@@ -381,7 +381,7 @@ func (p *BlsCosi) collectSignatures() (ResponseMap, error) {
 			numFailure, p.Threshold)
 	}
 
-	return responseMap, nil
+	return ResponseMap, nil
 }
 
 // Sign the message with this node and aggregates with all child signatures (in structResponses)

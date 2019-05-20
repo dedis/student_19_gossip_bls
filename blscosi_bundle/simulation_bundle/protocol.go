@@ -44,6 +44,10 @@ type SimulationProtocol struct {
 	FailingLeaves int
 	MinDelay      float64
 	MaxDelay      float64
+	GossipTick    float64
+	RumorPeers    int
+	ShutdownPeers int
+	TreeMode      int
 }
 
 // NewSimulationProtocol is used internally to register the simulation (see the init()
@@ -146,11 +150,19 @@ func (s *SimulationProtocol) Run(config *onet.SimulationConfig) error {
 		blscosiService := config.GetService(blscosi.ServiceName).(*blscosi.Service)
 		blscosiService.Threshold = s.Hosts - s.FailingLeaves
 
+		params := protocol.Parameters{
+			GossipTick:    time.Duration(s.GossipTick * float64(time.Second/time.Nanosecond)),
+			RumorPeers:    s.RumorPeers,
+			ShutdownPeers: s.ShutdownPeers,
+			TreeMode:      s.TreeMode != 0,
+		}
+
 		client := blscosi.NewClient()
 		proposal := []byte{0xFF}
 		serviceReq := &blscosi.SignatureRequest{
 			Roster:  config.Roster,
 			Message: proposal,
+			Params:  params,
 		}
 		serviceReply := &blscosi.SignatureResponse{}
 

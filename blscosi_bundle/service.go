@@ -42,6 +42,7 @@ type Service struct {
 type SignatureRequest struct {
 	Message []byte
 	Roster  *onet.Roster
+	Params  protocol.Parameters
 }
 
 // SignatureResponse is what the Cosi service will reply to clients.
@@ -70,6 +71,10 @@ func (s *Service) SignatureRequest(req *SignatureRequest) (network.Message, erro
 	p := pi.(*protocol.BlsCosi)
 	p.Timeout = s.Timeout
 	p.Msg = req.Message
+	p.Params = req.Params
+	if p.Params == (protocol.Parameters{}) {
+		p.Params = protocol.DefaultParams()
+	}
 
 	// Threshold before the subtrees so that we can optimize situation
 	// like a threshold of one
