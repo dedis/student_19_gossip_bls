@@ -1,42 +1,24 @@
-\documentclass{article}
+\documentclass[11pt, a4paper, twoside, openright]{article} %draft
 
 \usepackage[utf8]{inputenc}
+\usepackage{graphicx,color}
+\usepackage{amssymb, amsmath, array}
 \usepackage{hyperref}     % should be the last package included
 
-
-\title{BLS cosigning via gossip protocol}
-\author{Lukas Gelbmann}
-\date{June 2019}
 
 
 \begin{document}
 
-\maketitle
+\input{cover}
 
+\newpage
+\thispagestyle{empty}
+\tableofcontents{\protect\thispagestyle{empty}
+\newpage
 
-\begin{abstract}
+% Start page count
+\setcounter{page}{1}
 
-Abstract.
-
-\end{abstract}
-
-
-\tableofcontents
-
-
-\section{Introduction}
-
-
-\section{Methodology}
-
-
-\section{Results}
-
-
-\section{Conclusion}
-
-
-\bibliographystyle{plain}
-\bibliography{references}
+\input{report}
 
 \end{document}

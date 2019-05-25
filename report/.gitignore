@@ -6,3 +6,5 @@
 *.out
 *.pdf
 *.toc
+
+!logo_epfl_coul-eps-converted-to.pdf
