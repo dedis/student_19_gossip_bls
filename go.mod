@@ -23,7 +23,7 @@ require (
 	golang.org/x/mobile v0.0.0-20190509164839-32b2708ab171 // indirect
 	golang.org/x/net v0.0.0-20190522155817-f3200d17e092 // indirect
 	golang.org/x/oauth2 v0.0.0-20190523182746-aaccbc9213b0 // indirect
-	golang.org/x/sys v0.0.0-20190526052359-791d8a0f4d09 // indirect
+	golang.org/x/sys v0.0.0-20190527092632-ea4c425e90c7 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	golang.org/x/tools v0.0.0-20190525145741-7be61e1b0e51 // indirect

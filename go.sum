@@ -167,6 +167,10 @@ golang.org/x/sys v0.0.0-20190516110030-61b9204099cb h1:k07iPOt0d6nEnwXF+kHB+iEg+
 golang.org/x/sys v0.0.0-20190516110030-61b9204099cb/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190526052359-791d8a0f4d09 h1:IlD35wZE03o2qJy2o37WIskL33b7PT6cHdGnE8bieZs=
 golang.org/x/sys v0.0.0-20190526052359-791d8a0f4d09/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20190527092520-56c252d0536b h1:kX2tB0zGOeAcAtqpnit4VwTKi3RWiY7fomBjS3PScnE=
+golang.org/x/sys v0.0.0-20190527092520-56c252d0536b/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20190527092632-ea4c425e90c7 h1:mR9rCowgyyXhit8Dyl4ECXOwxRFfm198CDqlkV893ZA=
+golang.org/x/sys v0.0.0-20190527092632-ea4c425e90c7/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2 h1:z99zHgr7hKfrUcX/KsoJk5FJfjTceCKIp96+biqP4To=
 golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=

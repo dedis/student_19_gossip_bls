@@ -203,6 +203,7 @@ func (p *BlsCosi) Dispatch() error {
 	for !shutdown {
 		select {
 		case rumor := <-p.RumorsChan:
+			log.Lvl1("from", rumor.TreeNode.ServerIdentity.Public, rumor.TreeNode.ServerIdentity.ServicePublic("bundleCoSiService"))
 			err = responses.Update(rumor.ResponseMap)
 			if err != nil {
 				return err
@@ -211,9 +212,9 @@ func (p *BlsCosi) Dispatch() error {
 				responses.Count(), p.Threshold, p.IsRoot())
 			if p.IsRoot() && p.isEnough(responses) {
 				// We've got all the signatures.
-				res := responses.(TreeResponses)
-				log.Lvl5("Got all the signatures",
-					res.mask.CountEnabled(), res.responses, res.mask.Mask())
+				//res := responses.(TreeResponses)
+				//log.Lvl5("Got all the signatures",
+				//	res.mask.CountEnabled(), res.responses, res.mask.Mask())
 				shutdown = true
 			}
 		case shutdownMsg := <-p.ShutdownChan:
@@ -454,6 +455,7 @@ func (p *BlsCosi) checkFailureThreshold(numFailure int) bool {
 // idx is this node's index
 func (p *BlsCosi) makeResponse() (*Response, int, error) {
 	mask, err := sign.NewMask(p.suite, p.Publics(), p.Public())
+	log.Lvl2("signing with", p.Public())
 	if err != nil {
 		return nil, 0, err
 	}
