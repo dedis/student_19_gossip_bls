@@ -85,6 +85,28 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 
 	leaves := config.Tree.Root.Children
 
+	if s.MaxDelay > 0 {
+		// delay announcements
+		config.Server.RegisterProcessorFunc(onet.ProtocolMsgID, func(e *network.Envelope) error {
+			//get message
+			_, msg, err := network.Unmarshal(e.Msg.(*onet.ProtocolMsg).MsgSlice, config.Server.Suite())
+			if err != nil {
+				log.Fatal("error while unmarshaling a message:", err)
+				return err
+			}
+
+			switch msg.(type) {
+			case *protocol.Rumor, *protocol.Shutdown:
+				sleepSecs := rand.Float64()*(s.MaxDelay-s.MinDelay) + s.MinDelay
+				sleepNsecs := sleepSecs * float64(time.Second/time.Nanosecond)
+				log.Lvlf3("Delaying message by %.3f for simulation on %v", sleepSecs, config.Server.ServerIdentity)
+				time.Sleep(time.Duration(sleepNsecs))
+			}
+			config.Overlay.Process(e)
+			return nil
+		})
+	}
+
 	numToIntercept := s.FailingLeaves
 	if len(leaves) < s.FailingLeaves {
 		log.Lvl1("Warning: not enough children for failing. Is the shape of the tree correct?")
@@ -94,6 +116,7 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 	// intercept announcements on some nodes
 	for _, n := range toIntercept {
 		if n.ServerIdentity.ID.Equal(config.Server.ServerIdentity.ID) {
+			// This will override the delay ProcessorFunc, which is fine.
 			config.Server.RegisterProcessorFunc(onet.ProtocolMsgID, func(e *network.Envelope) error {
 				//get message
 				_, msg, err := network.Unmarshal(e.Msg.(*onet.ProtocolMsg).MsgSlice, config.Server.Suite())
@@ -114,28 +137,6 @@ func (s *SimulationProtocol) Node(config *onet.SimulationConfig) error {
 		}
 	}
 
-	if s.MaxDelay > 0 {
-		// delay announcements
-		config.Server.RegisterProcessorFunc(onet.ProtocolMsgID, func(e *network.Envelope) error {
-			//get message
-			_, msg, err := network.Unmarshal(e.Msg.(*onet.ProtocolMsg).MsgSlice, config.Server.Suite())
-			if err != nil {
-				log.Fatal("error while unmarshaling a message:", err)
-				return err
-			}
-
-			switch msg.(type) {
-			case *protocol.Rumor, *protocol.Shutdown:
-				sleepSecs := rand.Float64()*(s.MaxDelay-s.MinDelay) + s.MinDelay
-				sleepNsecs := sleepSecs * float64(time.Second/time.Nanosecond)
-				log.Lvlf2("Delaying message by %.3f for simulation on %v", sleepSecs, config.Server.ServerIdentity)
-				time.Sleep(time.Duration(sleepNsecs))
-			}
-			config.Overlay.Process(e)
-			return nil
-		})
-	}
-
 	log.Lvl3("Initializing node-index", index)
 	return s.SimulationBFTree.Node(config)
 }
@@ -148,7 +149,8 @@ func (s *SimulationProtocol) Run(config *onet.SimulationConfig) error {
 		log.Lvl1("Starting round", round)
 		round := monitor.NewTimeMeasure("round")
 		blscosiService := config.GetService(blscosi.ServiceName).(*blscosi.Service)
-		blscosiService.Threshold = s.Hosts - s.FailingLeaves
+
+		blscosiService.Threshold = s.Hosts - (s.Hosts-1)/3
 
 		params := protocol.Parameters{
 			GossipTick:    time.Duration(s.GossipTick * float64(time.Second/time.Nanosecond)),

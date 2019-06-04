@@ -203,7 +203,6 @@ func (p *BlsCosi) Dispatch() error {
 	for !shutdown {
 		select {
 		case rumor := <-p.RumorsChan:
-			log.Lvl1("from", rumor.TreeNode.ServerIdentity.Public, rumor.TreeNode.ServerIdentity.ServicePublic("bundleCoSiService"))
 			err = responses.Update(rumor.ResponseMap)
 			if err != nil {
 				return err
