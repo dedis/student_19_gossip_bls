@@ -1,3 +1,6 @@
-*.toml
+simulations_new_1.toml
+simulations_ref_1.toml
 
+/build/
 /test_data/
+/figures/

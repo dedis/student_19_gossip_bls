@@ -150,7 +150,6 @@ func (s *SimulationProtocol) Run(config *onet.SimulationConfig) error {
 		blscosiService := config.GetService(blscosi.ServiceName).(*blscosi.Service)
 		blscosiService.NSubtrees = s.NSubtrees
 		blscosiService.Threshold = s.Hosts - (s.Hosts-1)/3
-		log.Lvl1("AAAAAAA", blscosiService.Threshold)
 
 		client := blscosi.NewClient()
 		proposal := []byte{0xFF}

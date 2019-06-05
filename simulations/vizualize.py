@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Script to vizaulize the results."""
+"""Script to visualize the results."""
 
 import collections
 import csv

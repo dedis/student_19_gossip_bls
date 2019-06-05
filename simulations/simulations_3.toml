@@ -1,0 +1,17 @@
+Simulation = "BlsCosiBundleProtocol"
+Servers = 1
+Bf = 200
+Rounds = 20
+RunWait = "600s"
+Suite = "bn256.adapter"
+
+Hosts, FailingLeaves, MinDelay, MaxDelay, GossipTick, RumorPeers, ShutdownPeers, TreeMode
+25, 0, 0.095, 0.105, 0.07, 3, 2, 0
+25, 1, 0.095, 0.105, 0.07, 3, 2, 0
+25, 2, 0.095, 0.105, 0.07, 3, 2, 0
+25, 3, 0.095, 0.105, 0.07, 3, 2, 0
+25, 4, 0.095, 0.105, 0.07, 3, 2, 0
+25, 5, 0.095, 0.105, 0.07, 3, 2, 0
+25, 6, 0.095, 0.105, 0.07, 3, 2, 0
+25, 7, 0.095, 0.105, 0.07, 3, 2, 0
+25, 8, 0.095, 0.105, 0.07, 3, 2, 0
