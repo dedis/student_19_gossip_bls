@@ -34,6 +34,8 @@ import (
 	"go.dedis.ch/onet/v3/simul/monitor"
 )
 
+const roundSleep = 4 * time.Second
+
 func init() {
 	onet.SimulationRegister("BlsCosiProtocol", NewSimulationProtocol)
 }
@@ -146,6 +148,9 @@ func (s *SimulationProtocol) Run(config *onet.SimulationConfig) error {
 	log.Lvl2("Size is:", size, "rounds:", s.Rounds)
 	for round := 0; round < s.Rounds; round++ {
 		log.Lvl1("Starting round", round)
+
+		time.Sleep(roundSleep)
+
 		round := monitor.NewTimeMeasure("round")
 		blscosiService := config.GetService(blscosi.ServiceName).(*blscosi.Service)
 		blscosiService.NSubtrees = s.NSubtrees

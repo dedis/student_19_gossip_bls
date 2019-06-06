@@ -398,25 +398,22 @@ func (p *BlsCosi) getRandomPeers(numTargets int) ([]*onet.TreeNode, error) {
 		return nil, errors.New("not enough nodes in the roster")
 	}
 
-	var results []*onet.TreeNode
-	for i := 0; i < numTargets; i++ {
-		index := rand.Intn(numPeers)
+	arr := make([]int, numPeers)
+	for i := range arr {
+		arr[i] = i
+	}
+	rand.Shuffle(len(arr), func(i, j int) { arr[i], arr[j] = arr[j], arr[i] })
+
+	results := make([]*onet.TreeNode, numTargets)
+	for i := range results {
+		index := arr[i]
 		if index >= selfIndex {
 			index++
 		}
-		results = append(results, allNodes[index])
+		results[i] = allNodes[index]
 	}
 
 	return results, nil
-}
-
-// getRandomPeer returns a random peer (not including self).
-func (p *BlsCosi) getRandomPeer() (*onet.TreeNode, error) {
-	peers, err := p.getRandomPeers(1)
-	if err != nil {
-		return nil, err
-	}
-	return peers[0], nil
 }
 
 // checkIntegrity checks if the protocol has been instantiated with

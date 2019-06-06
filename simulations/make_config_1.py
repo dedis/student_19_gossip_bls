@@ -21,7 +21,7 @@ MAX_DELAY = 0.105
 GOSSIP_TICK = 0.07
 RUMOR_PEERS = 3
 SHUTDOWN_PEERS = 2
-TREE_MODE = 0
+TREE_MODE = 1
 
 
 def print_toml(filename, protocol, new=False):
@@ -41,7 +41,7 @@ def print_toml(filename, protocol, new=False):
             print('Hosts, NSubtrees, FailingSubleaders, FailingLeafs, MinDelay, '
                   'MaxDelay', file=dest)
 
-        for num_nodes in 7, 16, 25:
+        for num_nodes in 7, 16, 25, 36:
             max_failures = (num_nodes-1)//3
             for num_failing in range(max_failures + 1):
                 for _ in range(ROUNDS):
