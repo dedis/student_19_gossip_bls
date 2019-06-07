@@ -1,22 +1,28 @@
-\documentclass[11pt, a4paper, twoside, openright]{article} %draft
+\documentclass[11pt, a4paper]{article}
 
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx,color}
+\usepackage{epstopdf}
 \usepackage{amssymb, amsmath, array}
-\usepackage{hyperref}     % should be the last package included
+\usepackage[hidelinks]{hyperref}     % should be the last package included
 
 
 
 \begin{document}
 
+\pagenumbering{Alph}
+
 \input{cover}
 
 \newpage
 \thispagestyle{empty}
-\tableofcontents{\protect\thispagestyle{empty}
+
+\tableofcontents{\protect\thispagestyle{empty}}
+
 \newpage
 
 % Start page count
+\pagenumbering{arabic}
 \setcounter{page}{1}
 
 \input{report}

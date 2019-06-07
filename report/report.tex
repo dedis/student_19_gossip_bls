@@ -1,32 +1,132 @@
+\begin{abstract}
+
+Abstract.
+
+\end{abstract}
+
+
 \section{Introduction}
+
+introduction to the problem space: what problem, setting, context
+
+outline the situation: what solution exists, what are its properties
+
+outline the solution approach: gossip, what are its properties
+
+give an overview of the rest of the paper: sections
 
 
 \section{Motivation}
 
+why is this even relevant: general idea
+
+blockchain
+
+software transparency~\cite{Ford16}
+
+what are the shortcomings
+
+criteria
+
 
 \section{Background}
 
+background is this and that
+
+
 \subsection{Gossip protocols}
+
+random peer selection
+
+push and pull
+
+two state and three state
+
+very short lived sets this apart
+
+tradeoffs
+
 
 \subsection{BLS cosigning}
 
+what is cosigning
 
-\section{Methodology}
+aggregation: what is it, why is it useful
+
+BLS
+
+BDN
+
+difficulties
 
 
-\section{Results and analysis}
+\section{Implementation}
+
+golang
+
+cothority, onet, kyber
+
+the protocol itself in detail: including shutdown
+
+the parameters and what do they do
+
+reason for this architecture
 
 
-\section{Discussion}
+\section{Methodology for evaluation of the protocol through experiments}
+
+simulation framework
+
+vary one or two parameters at a time to isolate the effect
+
+
+\section{Results}
+
+big section
+
+
+\section{Evaluation and discussion of the findings}
+
+general things about the protocol
+
+strengths and limitations
+
 
 \subsection{Limitations}
 
+no adaptive behavior
+
+no guarantees apart from probabilistic
+
+need to be access-restricted
+
+
 \subsection{Future work}
+
+selecting peers, but watch out
+
+aggregation, but hard
+
+push and pull as an optimization
+
+messages as an optimization
 
 
 \section{Conclusion}
 
+conclude
 
+
+\newpage
 \appendix
 
-\section{Installation and running}
+
+\section{Appendix: Installation and running}
+
+
+\section{Appendix: Simulations and figures}
+
+
+\raggedright
+\bibliographystyle{plain}
+\bibliography{references}
