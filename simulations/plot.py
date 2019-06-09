@@ -20,6 +20,9 @@ METRICS = [
     ('bandwidth_tx_sum', 'data sent per active node (kB)', 'data transferred', 0.001, True),
 ]
 
+PALETTE = sns.color_palette('hls', 3)
+PALETTE[:2], PALETTE[2:] = PALETTE[1:], PALETTE[:1]
+
 
 def analysis_1():
     ref = parse('simulations_ref_1', check_sanity=False)
@@ -46,7 +49,7 @@ def analysis_1():
 
         _, ax = plt.subplots()
         sns.barplot(ref_part_failing, ref_failure, color='red', ci=68, capsize=.2)
-        plt.title(f'Old protocol: rates of total protocol failure ($n={num_nodes}$)')
+        plt.title(f'BLS CoSi: rates of total protocol failure ($n={num_nodes}$)')
         plt.xlabel('failing nodes')
         plt.ylabel('protocol failure rate')
         ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda y, _: format(y, '.0%')))
@@ -62,15 +65,17 @@ def analysis_1():
             sns.stripplot(ref_part_failing, ref_part[metric], size=5, palette=palette)
             handles, _, _, _ = matplotlib.legend._parse_legend_args([ax], ['', ''])
             ax.clear()
-            ax.legend(handles, ['gossip protocol instance', 'old protocol instance'])
+            ax.legend(handles, ['gossip protocol instance', 'BLS CoSi instance'])
 
             if per_node:
                 num_working = ref_part.hosts - ref_part_failing
                 factor_adj = factor / num_working
             else:
                 factor_adj = factor
-            sns.stripplot(ref_part_failing, extract(ref_part, metric, factor_adj, False), size=3, color=palette[1])
-            sns.stripplot(new_part.failingleaves, extract(new_part, metric, factor, per_node), size=3, color=palette[0])
+            y_ref = extract(ref_part, metric, factor_adj, False)
+            y_new = extract(new_part, metric, factor, per_node)
+            sns.stripplot(ref_part_failing, y_ref, size=3, color=palette[1])
+            sns.stripplot(new_part.failingleaves, y_new, size=3, color=palette[0])
             plt.title(f'Comparison of {title} ($n={num_nodes}$)')
             plt.xlabel('failing nodes')
             plt.ylabel(label)
@@ -83,15 +88,17 @@ def analysis_1():
             sns.stripplot(ref_part_failing, ref_part[metric], size=5, palette=palette)
             handles, _, _, _ = matplotlib.legend._parse_legend_args([ax], ['', ''])
             ax.clear()
-            ax.legend(handles, ['gossip protocol instance', 'old protocol instance'])
+            ax.legend(handles, ['gossip protocol instance', 'BLS CoSi instance'])
 
             if per_node:
                 num_working = ref_part.hosts - ref_part_failing
                 factor_adj = factor / num_working
             else:
                 factor_adj = factor
-            sns.stripplot(ref_part_failing, extract(ref_part, metric, factor_adj, False), size=3, color=palette[1])
-            sns.stripplot(new_part.failingleaves, extract(new_part, metric, factor, per_node), size=3, color=palette[0])
+            y_ref = extract(ref_part, metric, factor_adj, False)
+            y_new = extract(new_part, metric, factor, per_node)
+            sns.stripplot(ref_part_failing, y_ref, size=3, color=palette[1])
+            sns.stripplot(new_part.failingleaves, y_new, size=3, color=palette[0])
             plt.title(f'Comparison of {title} ($n={num_nodes}$)')
             plt.xlabel('failing nodes')
             plt.ylabel(label)
@@ -102,13 +109,16 @@ def analysis_2():
     results = parse('simulations_2', can_differ=['failingleaves', 'delay'])
     num_nodes = results.hosts[0]
     delay = (results.mindelay + results.maxdelay) / 2
-    hue = [f'{f} failing nodes' for f in results.failingleaves]
+    hue = list(results.failingleaves.astype(str))
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.lineplot(delay, extract(results, metric, factor, per_node), hue)
+        y = extract(results, metric, factor, per_node)
+        sns.lineplot(delay, y, hue, palette=PALETTE, marker='o')
         plt.xlabel('message delay (sec)')
         plt.ylabel(label)
+        plt.xlim((0, None))
         plt.title(f'Mean {title} vs. message delay ($n={num_nodes}$)')
+        plt.legend(title='failing nodes')
         save_fig(f'{metric}_by_delay', 2)
 
 
@@ -117,7 +127,8 @@ def analysis_3():
     num_nodes = results.hosts[0]
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.scatterplot(results.failingleaves, extract(results, metric, factor, per_node))
+        y = extract(results, metric, factor, per_node)
+        sns.scatterplot(results.failingleaves, y)
         plt.xlabel('failing nodes')
         plt.ylabel(label)
         plt.title(f'Mean {title} vs. number of failing nodes ($n={num_nodes}$)')
@@ -127,9 +138,11 @@ def analysis_3():
 def analysis_4():
     results = parse('simulations_4', can_differ=['hosts'])
     hue = ['tree-based aggregation' if tm else 'no early aggregation' for tm in results.treemode]
+    palette = sns.color_palette(n_colors=3)[:0:-1]
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.lineplot(results.hosts, extract(results, metric, factor, per_node), hue)
+        y = extract(results, metric, factor, per_node)
+        sns.scatterplot(results.hosts, y, hue, palette=palette)
         plt.xlabel('nodes')
         plt.ylabel(label)
         plt.title(f'Mean {title} vs. number of nodes (no failing nodes)')
@@ -139,65 +152,77 @@ def analysis_4():
 def analysis_5():
     results = parse('simulations_5', can_differ=['hosts', 'delay'])
     delay = (results.mindelay + results.maxdelay) / 2
-    hue = [f'mean message delay: {d}s' for d in delay]
+    hue = [f'{d:.2f}s' for d in delay]
+    palette = sns.color_palette('cubehelix', 3)
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.lineplot(results.hosts, extract(results, metric, factor, per_node), hue)
+        y = extract(results, metric, factor, per_node)
+        sns.scatterplot(results.hosts, y, hue, palette=palette)
         plt.xlabel('nodes')
         plt.ylabel(label)
         plt.title(f'Mean {title} vs. number of nodes (no failing nodes)')
+        plt.legend(title='mean message delay')
         save_fig(f'{metric}_by_num_nodes', 5)
 
 
 def analysis_6():
     results = parse('simulations_6', can_differ=['gossiptick', 'failingleaves'])
     num_nodes = results.hosts[0]
-    hue = [f'{f} failing nodes' for f in results.failingleaves]
+    hue = list(results.failingleaves.astype(str))
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.lineplot(results.gossiptick, extract(results, metric, factor, per_node), hue)
-        plt.xlabel('gossip tick (sec)')
+        y = extract(results, metric, factor, per_node)
+        sns.lineplot(results.gossiptick, y, hue, palette=PALETTE, marker='o')
+        plt.xlabel('rumor-sending interval $t$ (sec)')
         plt.ylabel(label)
-        plt.title(f'Mean {title} vs. gossip tick ($n={num_nodes}$)')
+        plt.xlim((0, None))
+        plt.title(f'Mean {title} vs. rumor-sending interval ($n={num_nodes}$)')
+        plt.legend(title='failing nodes')
         save_fig(f'{metric}_by_gossip_tick', 6)
 
 
 def analysis_7():
     results = parse('simulations_7', can_differ=['rumorpeers', 'failingleaves'])
     num_nodes = results.hosts[0]
-    hue = [f'{f} failing nodes' for f in results.failingleaves]
+    hue = list(results.failingleaves.astype(str))
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.scatterplot(results.rumorpeers, extract(results, metric, factor, per_node), hue)
+        y = extract(results, metric, factor, per_node)
+        sns.scatterplot(results.rumorpeers, y, hue, palette=PALETTE)
         plt.xlabel('rumor targets')
         plt.ylabel(label)
         plt.title(f'Mean {title} vs. number of rumor targets ($n={num_nodes}$)')
+        plt.legend(title='failing nodes')
         save_fig(f'{metric}_by_rumor_targets', 7)
 
 
 def analysis_8():
     results = parse('simulations_8', can_differ=['shutdownpeers', 'failingleaves'])
     num_nodes = results.hosts[0]
-    hue = [f'{f} failing nodes' for f in results.failingleaves]
+    hue = list(results.failingleaves.astype(str))
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.scatterplot(results.shutdownpeers, extract(results, metric, factor, per_node), hue)
+        y = extract(results, metric, factor, per_node)
+        sns.scatterplot(results.shutdownpeers, y, hue, palette=PALETTE)
         plt.xlabel('shutdown targets')
         plt.ylabel(label)
         plt.title(f'Mean {title} vs. number of shutdown targets ($n={num_nodes}$)')
+        plt.legend(title='failing nodes')
         save_fig(f'{metric}_by_shutdown_targets', 8)
 
 
 def analysis_9():
     results = parse('simulations_9', can_differ=['gossiptick', 'rumorpeers', 'failingleaves'])
     num_nodes = results.hosts[0]
-    hue = [f'{f} failing nodes' for f in results.failingleaves]
+    hue = list(results.failingleaves.astype(str))
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.scatterplot(results.rumorpeers, extract(results, metric, factor, per_node), hue)
+        y = extract(results, metric, factor, per_node)
+        sns.scatterplot(results.rumorpeers, y, hue, palette=PALETTE)
         plt.xlabel('rumor targets')
         plt.ylabel(label)
-        plt.title(f'Mean {title} vs. number of rumor targets\n(gossip tick adjusted to keep messages per node per second\nconstant) ($n={num_nodes}$)')
+        plt.title(f'Mean {title} vs. number of rumor targets\n(rumor interval adjusted proportionally; $n={num_nodes}$)')
+        plt.legend(title='failing nodes')
         save_fig(f'{metric}_by_rumor_targets', 9)
 
 
@@ -208,13 +233,16 @@ def analysis_10():
     delay = delays[0]
     assert (delays - delay < 0.000001).all()
     delay_interval = results.maxdelay - results.mindelay
-    hue = [f'{f} failing nodes' for f in results.failingleaves]
+    hue = list(results.failingleaves.astype(str))
     for metric, label, title, factor, per_node in METRICS:
         plt.subplots()
-        sns.lineplot(delay_interval, extract(results, metric, factor, per_node), hue)
+        y = extract(results, metric, factor, per_node)
+        sns.lineplot(delay_interval, y, hue, palette=PALETTE, marker='o')
         plt.xlabel('message delay range')
         plt.ylabel(label)
-        plt.title(f'Mean {title} vs. message delay range\n(mean message delay is always {delay}s) ($n={num_nodes}$)')
+        plt.xlim((0, None))
+        plt.title(f'Mean {title} vs. message delay range ($n={num_nodes}$)')
+        plt.legend(title='failing nodes')
         save_fig(f'{metric}_by_delay_range', 10)
 
 
@@ -269,6 +297,7 @@ def save_fig(name, analysis, tight_layout=True, ylim=(0, None), close=True):
 
 
 def main():
+    matplotlib.rcParams['figure.figsize'] = 7.36, 5.52
     sns.set_style('whitegrid')
     sns.set_context('notebook')
     analysis_1()

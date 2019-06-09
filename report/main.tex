@@ -4,8 +4,14 @@
 \usepackage{graphicx,color}
 \usepackage{epstopdf}
 \usepackage{amssymb, amsmath, array}
-\usepackage[hidelinks]{hyperref}     % should be the last package included
+\usepackage{float}
+\usepackage[margin=2em]{caption}
+\PassOptionsToPackage{hyphens}{url}\usepackage[hidelinks]{hyperref}     % should be the last package included
 
+\captionsetup{justification=raggedright}
+
+\hyphenpenalty=100
+\lefthyphenmin=3
 
 
 \begin{document}
@@ -14,8 +20,25 @@
 
 \input{cover}
 
+\hypersetup{
+    pdfauthor = {Lukas Gelbmann},
+    pdftitle = {BLS Cosigning via a Gossip Protocol}
+}
+
 \newpage
 \thispagestyle{empty}
+
+\begin{abstract}
+
+Decentralized cosigning protocols, which collect digital signatures of a message from many peers, play a central role in several applications.
+In this semester project, a new gossip-based cosigning protocol using Boneh-Lynn-Shacham (BLS) signatures is designed, built and tested in simulations.
+The main goals are for the new protocol to be highly fault tolerant, relatively fast and not to overwhelm any node.
+The new gossip protocol is compared with BLS~CoSi, an existing cosigning protocol, in experiments, with the new protocol performing better in the most important metrics, but not in terms of efficiency.
+The new protocol's performance is then analyzed, showing possible avenues for future improvement.
+
+\end{abstract}
+
+\vspace{0.3em}
 
 \tableofcontents{\protect\thispagestyle{empty}}
 
